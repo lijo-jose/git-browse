@@ -9,6 +9,7 @@ import StashList from '@/components/git/StashList';
 interface Props {
   repo: string; activeTab: string; onTabChange: (t: string) => void;
   onFileSelect: (f: string, s: boolean) => void; onCommitSelect: (h: string) => void;
+  onCommitFileSelect: (hash: string, file: string) => void;
   selectedFile?: string; selectedCommit?: string;
 }
 
@@ -19,7 +20,7 @@ const TABS = [
   { value: 'stash', label: 'Stash' },
 ];
 
-export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, selectedFile, selectedCommit }: Props) {
+export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, onCommitFileSelect, selectedFile, selectedCommit }: Props) {
   if (!repo) return (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-700">
       <svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" className="opacity-40">
@@ -47,7 +48,7 @@ export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, o
       </TabsList>
 
       <TabsContent value="log"      className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
-        <CommitGraph repo={repo} onCommitSelect={onCommitSelect} selectedCommit={selectedCommit} />
+        <CommitGraph repo={repo} onCommitSelect={onCommitSelect} onCommitFileSelect={onCommitFileSelect} selectedCommit={selectedCommit} selectedFile={selectedFile} />
       </TabsContent>
       <TabsContent value="changes"  className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
         <FileList repo={repo} onFileSelect={onFileSelect} selectedFile={selectedFile} />

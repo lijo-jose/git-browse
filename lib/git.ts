@@ -94,6 +94,21 @@ export function getLog(repoPath: string, page = 0, limit = 50): GraphLine[] {
   return result;
 }
 
+// ── Commit files ─────────────────────────────────────────────────────────────
+
+export interface CommitFile { path: string; status: string; }
+
+export function getCommitFiles(repoPath: string, commit: string): CommitFile[] {
+  const raw = execSync(
+    `git diff-tree --no-commit-id -r --name-status ${commit}`,
+    { cwd: repoPath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+  );
+  return raw.split('\n').filter(Boolean).map(line => {
+    const tab = line.indexOf('\t');
+    return { status: line.slice(0, tab).trim(), path: line.slice(tab + 1).trim() };
+  });
+}
+
 // ── Diff ─────────────────────────────────────────────────────────────────────
 
 export async function getDiff(

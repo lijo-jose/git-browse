@@ -71,6 +71,7 @@ export default function Home() {
             onTabChange={setActiveTab}
             onFileSelect={(f, s) => { setSelectedFile(f); setSelectedFileStaged(s); setSelectedCommit(undefined); if (!showDiff) setShowDiff(true); }}
             onCommitSelect={(h) => { setSelectedCommit(h); setSelectedFile(undefined); if (!showDiff) setShowDiff(true); }}
+            onCommitFileSelect={(h, f) => { setSelectedCommit(h); setSelectedFile(f); if (!showDiff) setShowDiff(true); }}
             selectedFile={selectedFile}
             selectedCommit={selectedCommit}
           />
