@@ -128,19 +128,20 @@ export interface BranchInfo {
 }
 
 export async function getBranches(repoPath: string): Promise<BranchInfo[]> {
-  const git = getGit(repoPath);
-  const result = await git.branch([
-    '-a', '--sort=-committerdate',
-    '--format=%(refname:short)|%(HEAD)|%(committerdate:relative)|%(subject)',
-  ]);
-  return result.all.map((line) => {
-    const parts = line.split('|');
+  // Use NUL as field separator and newline as record separator to avoid any
+  // clash with pipe characters that appear in commit subjects.
+  const raw = execSync(
+    'git branch -a --sort=-committerdate --format=%(refname:short)%00%(HEAD)%00%(committerdate:relative)%00%(subject)',
+    { cwd: repoPath, encoding: 'utf8' }
+  );
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [name, head, date, ...subjectParts] = line.split('\x00');
     return {
-      name: parts[0],
-      current: parts[1] === '*',
-      remote: parts[0].startsWith('remotes/') || parts[0].startsWith('origin/'),
-      lastCommitDate: parts[2],
-      lastCommit: parts[3],
+      name,
+      current: head === '*',
+      remote: name.startsWith('remotes/') || name.includes('/'),
+      lastCommitDate: date,
+      lastCommit: subjectParts.join('\x00'), // re-join in the impossible case subject had NUL
     };
   });
 }

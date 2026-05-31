@@ -123,9 +123,6 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
             {busy === id ? '…' : label}
           </button>
         ))}
-        <button disabled title="Push disabled for safety"
-          className="h-7 px-3 rounded-md text-xs font-medium text-zinc-700 cursor-not-allowed"
-        >Push</button>
       </div>
     </header>
   );
