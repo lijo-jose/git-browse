@@ -196,3 +196,36 @@ export async function pullRepo(repoPath: string): Promise<string> {
   const result = await getGit(repoPath).pull();
   return `${result.summary.changes} changes, ${result.summary.insertions} insertions, ${result.summary.deletions} deletions`;
 }
+
+// ── Staging ───────────────────────────────────────────────────────────────────
+
+export async function stageFiles(repoPath: string, files: string[]): Promise<void> {
+  await getGit(repoPath).add(files);
+}
+
+// ── Commit ────────────────────────────────────────────────────────────────────
+
+export async function commitChanges(repoPath: string, message: string, all: boolean): Promise<string> {
+  const args: string[] = ['-m', message];
+  if (all) args.unshift('-a');
+  const result = await getGit(repoPath).commit(message, all ? ['-a'] : []);
+  return result.summary.changes !== undefined
+    ? `Committed: ${result.commit}`
+    : `Committed: ${result.commit}`;
+}
+
+// ── Push ──────────────────────────────────────────────────────────────────────
+
+export async function pushBranch(
+  repoPath: string,
+  setUpstream: boolean,
+  branch: string,
+): Promise<string> {
+  const git = getGit(repoPath);
+  if (setUpstream) {
+    await git.push(['--set-upstream', 'origin', branch]);
+    return `Pushed and set upstream: origin/${branch}`;
+  }
+  await git.push();
+  return 'Pushed successfully';
+}

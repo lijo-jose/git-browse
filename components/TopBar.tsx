@@ -40,14 +40,25 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  const run = async (action: 'fetch' | 'pull') => {
+  const run = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     setBusy(action);
     try {
-      const res = await fetch(`/api/git/${action}?repo=${encodeURIComponent(repo)}`, { method: 'POST' });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success(`${action === 'fetch' ? 'Fetched' : 'Pulled'}`, { description: data.result || 'Done' });
+      if (action === 'push') {
+        const res = await fetch('/api/git/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo, setUpstream: false, branch: '' }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast.success('Pushed', { description: data.result || 'Done' });
+      } else {
+        const res = await fetch(`/api/git/${action}?repo=${encodeURIComponent(repo)}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        toast.success(`${action === 'fetch' ? 'Fetched' : 'Pulled'}`, { description: data.result || 'Done' });
+      }
     } catch (e) {
       toast.error(`${action} failed`, { description: String(e) });
     } finally { setBusy(null); }
@@ -114,10 +125,10 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        {[{ id: 'fetch', label: 'Fetch' }, { id: 'pull', label: 'Pull' }].map(({ id, label }) => (
+        {[{ id: 'fetch', label: 'Fetch' }, { id: 'pull', label: 'Pull' }, { id: 'push', label: 'Push' }].map(({ id, label }) => (
           <button key={id}
             disabled={!repo || busy !== null}
-            onClick={() => run(id as 'fetch' | 'pull')}
+            onClick={() => run(id as 'fetch' | 'pull' | 'push')}
             className="h-7 px-3 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             {busy === id ? '…' : label}
