@@ -16,9 +16,9 @@ export default function StashList({ repo }: { repo: string }) {
     if (!repo) return;
     setLoading(true);
     fetch(`/api/git/stash?repo=${encodeURIComponent(repo)}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.error) setError(d.error); else setStashes(d.stashes || []); })
-      .catch((e) => setError(String(e)))
+      .then(r => r.json())
+      .then(d => { if (d.error) setError(d.error); else setStashes(d.stashes || []); })
+      .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   };
 
@@ -27,12 +27,9 @@ export default function StashList({ repo }: { repo: string }) {
   const act = async (index: number, action: 'apply' | 'drop') => {
     setActing(index);
     try {
-      const res = await fetch(
-        `/api/git/stash/apply?repo=${encodeURIComponent(repo)}&index=${index}&action=${action}`,
-        { method: 'POST' }
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const res = await fetch(`/api/git/stash/apply?repo=${encodeURIComponent(repo)}&index=${index}&action=${action}`, { method: 'POST' });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
       toast.success(`Stash ${action === 'apply' ? 'applied' : 'dropped'}`);
       load();
     } catch (e) { toast.error(String(e)); }
@@ -40,36 +37,34 @@ export default function StashList({ repo }: { repo: string }) {
   };
 
   if (loading) return (
-    <div className="p-2 space-y-1">
-      {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-md bg-[#222]" />)}
+    <div className="p-3 space-y-1">
+      {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg bg-zinc-800/50" />)}
     </div>
   );
-  if (error) return <div className="p-4 text-[#c96b6b] text-xs">{error}</div>;
-  if (stashes.length === 0) return (
+  if (error) return <p className="p-4 text-rose-400 text-xs">{error}</p>;
+  if (!stashes.length) return (
     <div className="flex items-center justify-center h-full">
-      <p className="text-xs text-[#404040] font-medium">No stashes</p>
+      <p className="text-xs text-zinc-700 font-medium">No stashes</p>
     </div>
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-2 space-y-1">
-      {stashes.map((s) => (
-        <div key={s.index} className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-lg px-3 py-2.5 flex items-start justify-between gap-2 hover:border-[#383838] transition-colors">
+    <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
+      {stashes.map(s => (
+        <div key={s.index} className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 transition-colors">
           <div className="min-w-0">
-            <p className="text-[12px] text-[#b0b0b0] font-medium truncate">{s.message}</p>
-            {s.date && <p className="text-[10px] text-[#505050] mt-0.5">{s.date}</p>}
+            <p className="text-xs text-zinc-300 font-medium truncate">{s.message}</p>
+            {s.date && <p className="text-[10px] text-zinc-600 mt-0.5">{s.date}</p>}
           </div>
           <div className="flex gap-1 flex-shrink-0">
-            <button
-              className="text-[11px] font-medium text-[#5ab99b] hover:text-[#7dd4be] disabled:opacity-40 px-1.5 py-0.5 rounded hover:bg-[#5ab99b]/10 transition-colors"
-              disabled={acting !== null}
-              onClick={() => act(s.index, 'apply')}
-            >Apply</button>
-            <button
-              className="text-[11px] font-medium text-[#c96b6b] hover:text-[#e08080] disabled:opacity-40 px-1.5 py-0.5 rounded hover:bg-[#c96b6b]/10 transition-colors"
-              disabled={acting !== null}
-              onClick={() => act(s.index, 'drop')}
-            >Drop</button>
+            <button disabled={acting !== null} onClick={() => act(s.index, 'apply')}
+              className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition-colors">
+              Apply
+            </button>
+            <button disabled={acting !== null} onClick={() => act(s.index, 'drop')}
+              className="text-[11px] font-medium text-rose-400 hover:text-rose-300 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-rose-500/10 transition-colors">
+              Drop
+            </button>
           </div>
         </div>
       ))}

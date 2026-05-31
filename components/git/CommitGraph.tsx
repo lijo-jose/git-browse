@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -8,138 +8,150 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface GraphLine {
   type: 'commit' | 'graph';
   graph: string;
-  hash: string;
-  shortHash: string;
-  message: string;
-  author: string;
-  date: string;
-  refs: string;
+  hash: string; shortHash: string; message: string; author: string; date: string; refs: string;
 }
 
-interface Ref {
-  label: string;
-  kind: 'head' | 'local' | 'remote' | 'tag';
-}
+interface Ref { label: string; kind: 'head' | 'local' | 'remote' | 'tag'; }
 
-interface CommitGraphProps {
-  repo: string;
-  onCommitSelect: (hash: string) => void;
-  selectedCommit?: string;
-}
+// ── Layout constants ─────────────────────────────────────────────────────────
 
-// ── Branch colour palette ────────────────────────────────────────────────────
+const COL = 16;          // px per graph column
+const COMMIT_H = 30;     // row height for a commit row
+const CONN_H = 12;       // row height for connector-only rows
+const R = 4.5;           // commit node radius
+const SW = 1.5;          // stroke width for lines
 
-const PALETTE = [
-  '#4d9de0', // blue      (col 0)
-  '#d4a44c', // amber     (col 1)
-  '#5ab99b', // teal      (col 2)
-  '#c96b6b', // rose      (col 3)
-  '#9b7fd4', // purple    (col 4)
-  '#4dbbdb', // cyan      (col 5)
-  '#d48b5a', // orange    (col 6)
-  '#a0d45a', // lime      (col 7)
-  '#d45ab5', // pink      (col 8)
-  '#5ad48b', // mint      (col 9)
+// ── Branch colours ───────────────────────────────────────────────────────────
+
+const COLORS = [
+  '#3b82f6', // blue-500
+  '#f59e0b', // amber-500
+  '#10b981', // emerald-500
+  '#f43f5e', // rose-500
+  '#8b5cf6', // violet-500
+  '#06b6d4', // cyan-500
+  '#f97316', // orange-500
+  '#84cc16', // lime-500
+  '#ec4899', // pink-500
+  '#14b8a6', // teal-500
 ];
 
-function colColor(col: number): string {
-  return PALETTE[col % PALETTE.length];
-}
+function col2x(col: number) { return col * COL + COL / 2; }
+function branchColor(col: number) { return COLORS[col % COLORS.length]; }
 
-// ── Graph character → colour column mapping ──────────────────────────────────
-// git --graph uses 2 chars per visual column: [char][space]
-// We scan the raw graph prefix and assign a colour to each printed char
-// based on its logical column index (charPos / 2).
+// ── SVG graph slice for one row ───────────────────────────────────────────────
 
-interface GraphChar {
-  ch: string;
-  col: number; // logical column (0-based)
-}
+function GraphSVG({ graphStr, isCommit, height }: { graphStr: string; isCommit: boolean; height: number }) {
+  const maxCols = Math.max(Math.ceil(graphStr.length / 2) + 1, 2);
+  const width = maxCols * COL;
+  const midY = height / 2;
 
-function parseGraphPrefix(raw: string): GraphChar[] {
-  const result: GraphChar[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch === ' ') continue;          // spacing — skip, doesn't need colour
-    const col = Math.floor(i / 2);
-    result.push({ ch, col });
-  }
-  return result;
-}
+  const lines: React.ReactNode[] = [];
+  let nodeCol = -1;
 
-// Render a graph prefix string as a row of coloured monospace characters.
-function GraphPrefix({ raw, commitCol }: { raw: string; commitCol: number }) {
-  // Pad raw to a fixed width so commit rows and graph-only rows align
-  const chars = parseGraphPrefix(raw);
+  for (let i = 0; i < graphStr.length; i++) {
+    const ch = graphStr[i];
+    if (ch === ' ') continue;
 
-  // Rebuild as fixed-width spans. We iterate char by char over the raw string,
-  // turning every non-space char into a coloured span.
-  const spans: React.ReactNode[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch === ' ') {
-      spans.push(<span key={i}> </span>);
+    if (i % 2 === 0) {
+      // Even positions → vertical / node
+      const col = i / 2;
+      const x = col2x(col);
+      const color = branchColor(col);
+
+      if (ch === '*') {
+        nodeCol = col;
+        // Full vertical line (circle is drawn on top, masking center)
+        lines.push(<line key={`v${i}`} x1={x} y1={0} x2={x} y2={height} stroke={color} strokeWidth={SW} strokeLinecap="round" />);
+      } else if (ch === '|') {
+        lines.push(<line key={`v${i}`} x1={x} y1={0} x2={x} y2={height} stroke={color} strokeWidth={SW} strokeLinecap="round" opacity={0.6} />);
+      } else if (ch === '_') {
+        // Horizontal underline connector (git uses this for wide merges)
+        const x2 = col2x(col + 1);
+        lines.push(<line key={`h${i}`} x1={x} y1={midY} x2={x2} y2={midY} stroke={color} strokeWidth={SW} opacity={0.6} />);
+      }
     } else {
-      const col = Math.floor(i / 2);
-      const isNode = ch === '*';
-      const color = colColor(isNode ? commitCol : col);
-      spans.push(
-        <span
-          key={i}
-          style={{ color, fontWeight: isNode ? 700 : 400 }}
-        >
-          {ch}
-        </span>
-      );
+      // Odd positions → diagonals
+      const leftCol = Math.floor(i / 2);
+      const rightCol = leftCol + 1;
+      const xL = col2x(leftCol);
+      const xR = col2x(rightCol);
+
+      if (ch === '\\') {
+        // Goes from leftCol at top to rightCol at bottom
+        const color = branchColor(leftCol);
+        lines.push(<line key={`d${i}`} x1={xL} y1={0} x2={xR} y2={height} stroke={color} strokeWidth={SW} strokeLinecap="round" opacity={0.6} />);
+      } else if (ch === '/') {
+        // Goes from rightCol at top to leftCol at bottom
+        const color = branchColor(rightCol);
+        lines.push(<line key={`d${i}`} x1={xR} y1={0} x2={xL} y2={height} stroke={color} strokeWidth={SW} strokeLinecap="round" opacity={0.6} />);
+      } else if (ch === '-') {
+        const color = branchColor(leftCol);
+        lines.push(<line key={`h${i}`} x1={xL} y1={midY} x2={xR} y2={midY} stroke={color} strokeWidth={SW} opacity={0.6} />);
+      }
     }
   }
+
+  // Commit node on top — circle with inner dot
+  if (isCommit && nodeCol >= 0) {
+    const x = col2x(nodeCol);
+    const color = branchColor(nodeCol);
+    lines.push(
+      // Mask the line through the node
+      <circle key="mask" cx={x} cy={midY} r={R + 1} fill="#18181b" />,
+      // Colored ring
+      <circle key="ring" cx={x} cy={midY} r={R} fill="none" stroke={color} strokeWidth={2} />,
+      // Center dot
+      <circle key="dot" cx={x} cy={midY} r={2} fill={color} />,
+    );
+  }
+
   return (
-    <span className="font-mono text-[12px] leading-none whitespace-pre select-none flex-shrink-0">
-      {spans}
-    </span>
+    <svg width={width} height={height} style={{ overflow: 'visible', flexShrink: 0, display: 'block' }}>
+      {lines}
+    </svg>
   );
 }
 
-// ── Ref pill parser ──────────────────────────────────────────────────────────
+// ── Ref pills ────────────────────────────────────────────────────────────────
 
 function parseRefs(raw: string): Ref[] {
   if (!raw.trim()) return [];
-  return raw.split(',').map((r) => r.trim()).filter(Boolean).map((r): Ref => {
-    if (r.startsWith('HEAD ->')) return { label: r.replace('HEAD ->', '').trim(), kind: 'head' };
+  return raw.split(',').map(r => r.trim()).filter(Boolean).map((r): Ref => {
+    if (r.startsWith('HEAD ->')) return { label: r.slice(7).trim(), kind: 'head' };
     if (r === 'HEAD') return { label: 'HEAD', kind: 'head' };
-    if (r.startsWith('tag:')) return { label: r.replace('tag:', '').trim(), kind: 'tag' };
+    if (r.startsWith('tag:')) return { label: r.slice(4).trim(), kind: 'tag' };
     if (r.includes('/')) return { label: r, kind: 'remote' };
     return { label: r, kind: 'local' };
   });
 }
 
-const REF_STYLE: Record<Ref['kind'], string> = {
-  head:   'bg-[#5ab99b]/20 text-[#5ab99b] border border-[#5ab99b]/30',
-  local:  'bg-[#4d9de0]/15 text-[#4d9de0] border border-[#4d9de0]/25',
-  remote: 'bg-[#d4a44c]/15 text-[#d4a44c] border border-[#d4a44c]/25',
-  tag:    'bg-[#9b7fd4]/15 text-[#9b7fd4] border border-[#9b7fd4]/25',
+const REF_CLS: Record<Ref['kind'], string> = {
+  head:   'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25',
+  local:  'bg-blue-500/15    text-blue-400    ring-1 ring-blue-500/25',
+  remote: 'bg-amber-500/15   text-amber-400   ring-1 ring-amber-500/25',
+  tag:    'bg-violet-500/15  text-violet-400  ring-1 ring-violet-500/25',
 };
 
 function RefPills({ raw }: { raw: string }) {
   const refs = parseRefs(raw);
-  if (refs.length === 0) return null;
+  if (!refs.length) return null;
   return (
-    <span className="flex items-center gap-1 flex-shrink-0">
+    <span className="flex items-center gap-1 flex-shrink-0 flex-wrap">
       {refs.map((ref, i) => (
-        <span
-          key={i}
-          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md leading-none ${REF_STYLE[ref.kind]}`}
-        >
-          {ref.kind === 'head' ? '⬡ ' : ''}{ref.label}
+        <span key={i} className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md leading-none ${REF_CLS[ref.kind]}`}>
+          {ref.label}
         </span>
       ))}
     </span>
   );
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
-export default function CommitGraph({ repo, onCommitSelect, selectedCommit }: CommitGraphProps) {
+interface Props { repo: string; onCommitSelect: (hash: string) => void; selectedCommit?: string; }
+
+export default function CommitGraph({ repo, onCommitSelect, selectedCommit }: Props) {
   const [lines, setLines] = useState<GraphLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -155,10 +167,8 @@ export default function CommitGraph({ repo, onCommitSelect, selectedCommit }: Co
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
       const next: GraphLine[] = data.lines || [];
-      setLines((prev) => reset ? next : [...prev, ...next]);
-      // page has 50 commits; if we got fewer commit rows, assume done
-      const commitCount = next.filter((l) => l.type === 'commit').length;
-      setHasMore(commitCount === 50);
+      setLines(prev => reset ? next : [...prev, ...next]);
+      setHasMore(next.filter((l: GraphLine) => l.type === 'commit').length === 50);
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }, [repo]);
@@ -168,10 +178,9 @@ export default function CommitGraph({ repo, onCommitSelect, selectedCommit }: Co
     loadPage(0, true);
   }, [repo]);
 
-  // Infinite scroll
   useEffect(() => {
     if (!loaderRef.current) return;
-    const obs = new IntersectionObserver((entries) => {
+    const obs = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore && !loading) {
         const next = page + 1; setPage(next); loadPage(next);
       }
@@ -180,85 +189,73 @@ export default function CommitGraph({ repo, onCommitSelect, selectedCommit }: Co
     return () => obs.disconnect();
   }, [hasMore, loading, page, loadPage]);
 
-  if (error) return <div className="p-4 text-[#c96b6b] text-xs">{error}</div>;
+  if (error) return <div className="p-4 text-rose-400 text-xs">{error}</div>;
 
-  if (lines.length === 0 && loading) {
-    return (
-      <div className="p-2 space-y-px">
-        {Array.from({ length: 16 }).map((_, i) => (
-          <Skeleton key={i} className="h-6 rounded-none bg-[#1e1e1e]" style={{ opacity: 1 - i * 0.04 }} />
-        ))}
-      </div>
-    );
-  }
+  if (!lines.length && loading) return (
+    <div className="p-3 space-y-px">
+      {Array.from({ length: 18 }).map((_, i) => (
+        <Skeleton key={i} className="h-[30px] rounded-none bg-zinc-800/40" style={{ opacity: 1 - i * 0.04 }} />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="overflow-y-auto h-full overflow-x-hidden">
-      <div className="min-w-0">
-        {lines.map((line, idx) => {
-          // Find which column the '*' node is in for this row (determines its colour)
-          const nodePos = line.graph.indexOf('*');
-          const commitCol = nodePos >= 0 ? Math.floor(nodePos / 2) : 0;
+    <div className="overflow-y-auto h-full min-h-0">
+      {lines.map((line, idx) => {
+        const isCommit = line.type === 'commit';
+        const rowH = isCommit ? COMMIT_H : CONN_H;
 
-          if (line.type === 'graph') {
-            // Connector-only row — just render the graph prefix, no commit info
-            return (
-              <div key={idx} className="flex items-center h-[14px] px-3">
-                <GraphPrefix raw={line.graph} commitCol={commitCol} />
-              </div>
-            );
-          }
-
-          const isSelected = selectedCommit === line.hash;
-          const refs = parseRefs(line.refs);
-
+        if (!isCommit) {
           return (
-            <div
-              key={line.hash || idx}
-              className={`group flex items-center gap-3 px-3 py-[5px] cursor-pointer transition-colors ${
-                isSelected
-                  ? 'bg-[#4d9de0]/12'
-                  : 'hover:bg-[#1e1e1e]'
-              }`}
-              onClick={() => onCommitSelect(line.hash)}
-            >
-              {/* Graph tree */}
-              <GraphPrefix raw={line.graph} commitCol={commitCol} />
-
-              {/* Short hash */}
-              <span
-                className="font-mono text-[10.5px] w-[52px] flex-shrink-0 tabular-nums"
-                style={{ color: colColor(commitCol), opacity: 0.75 }}
-              >
-                {line.shortHash}
-              </span>
-
-              {/* Refs */}
-              {refs.length > 0 && <RefPills raw={line.refs} />}
-
-              {/* Message */}
-              <span className={`text-[12px] flex-1 truncate leading-tight font-medium min-w-0 ${
-                isSelected ? 'text-[#dcdcdc]' : 'text-[#909090] group-hover:text-[#c0c0c0]'
-              }`}>
-                {line.message}
-              </span>
-
-              {/* Author (first name only) */}
-              <span className="text-[10px] text-[#464646] w-20 flex-shrink-0 text-right truncate hidden lg:block">
-                {line.author.split(' ')[0]}
-              </span>
-
-              {/* Date */}
-              <span className="text-[10px] text-[#3c3c3c] w-16 flex-shrink-0 text-right whitespace-nowrap">
-                {line.date}
-              </span>
+            <div key={idx} style={{ height: rowH }} className="flex items-start px-3 pt-0">
+              <GraphSVG graphStr={line.graph} isCommit={false} height={rowH} />
             </div>
           );
-        })}
+        }
 
-        <div ref={loaderRef} className="h-6 flex items-center justify-center">
-          {loading && <span className="text-[11px] text-[#404040]">Loading…</span>}
-        </div>
+        const isSelected = selectedCommit === line.hash;
+
+        return (
+          <div key={line.hash || idx}
+            style={{ height: rowH }}
+            className={`group flex items-center gap-3 px-3 cursor-pointer transition-colors ${
+              isSelected ? 'bg-blue-500/8' : 'hover:bg-zinc-800/40'
+            }`}
+            onClick={() => onCommitSelect(line.hash)}
+          >
+            {/* SVG graph */}
+            <GraphSVG graphStr={line.graph} isCommit height={rowH} />
+
+            {/* Hash */}
+            <span className="font-mono text-[10px] text-zinc-600 w-[46px] flex-shrink-0 tabular-nums group-hover:text-zinc-500">
+              {line.shortHash}
+            </span>
+
+            {/* Refs */}
+            {line.refs && <RefPills raw={line.refs} />}
+
+            {/* Message */}
+            <span className={`text-[12px] font-medium flex-1 truncate min-w-0 leading-tight transition-colors ${
+              isSelected ? 'text-zinc-100' : 'text-zinc-400 group-hover:text-zinc-200'
+            }`}>
+              {line.message}
+            </span>
+
+            {/* Author */}
+            <span className="text-[10px] text-zinc-700 w-16 flex-shrink-0 text-right truncate hidden xl:block">
+              {line.author.split(' ')[0]}
+            </span>
+
+            {/* Date */}
+            <span className="text-[10px] text-zinc-700 w-14 flex-shrink-0 text-right whitespace-nowrap">
+              {line.date}
+            </span>
+          </div>
+        );
+      })}
+
+      <div ref={loaderRef} className="h-8 flex items-center justify-center">
+        {loading && <span className="text-[11px] text-zinc-700">Loading…</span>}
       </div>
     </div>
   );

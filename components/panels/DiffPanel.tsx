@@ -2,16 +2,11 @@
 
 import DiffViewer from '@/components/git/DiffViewer';
 
-interface DiffPanelProps {
-  repo: string;
-  file?: string;
-  commit?: string;
-  staged?: boolean;
-}
+interface Props { repo: string; file?: string; commit?: string; staged?: boolean; }
 
-export default function DiffPanel({ repo, file, commit, staged }: DiffPanelProps) {
+export default function DiffPanel({ repo, file, commit, staged }: Props) {
   return (
-    <div className="flex flex-col h-full bg-[#181825]">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       <DiffViewer repo={repo} file={file} commit={commit} staged={staged} />
     </div>
   );
