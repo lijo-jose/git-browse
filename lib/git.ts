@@ -1,0 +1,182 @@
+import simpleGit, { SimpleGit, LogResult } from 'simple-git';
+import { execSync } from 'child_process';
+
+export function getGit(repoPath: string): SimpleGit {
+  return simpleGit(repoPath);
+}
+
+export interface GitFileStatus {
+  path: string;
+  status: 'M' | 'A' | 'D' | '?' | 'R' | 'C' | 'U';
+  staged: boolean;
+  index?: string;
+  working?: string;
+}
+
+export async function getStatus(repoPath: string): Promise<GitFileStatus[]> {
+  const git = getGit(repoPath);
+  const status = await git.status();
+  const files: GitFileStatus[] = [];
+
+  for (const f of status.files) {
+    const index = f.index.trim();
+    const working = f.working_dir.trim();
+    if (index && index !== ' ' && index !== '?') {
+      files.push({ path: f.path, status: mapStatus(index), staged: true, index, working });
+    }
+    if (working && working !== ' ') {
+      files.push({ path: f.path, status: mapStatus(working), staged: false, index, working });
+    }
+  }
+  return files;
+}
+
+function mapStatus(s: string): GitFileStatus['status'] {
+  const map: Record<string, GitFileStatus['status']> = {
+    M: 'M', A: 'A', D: 'D', '?': '?', R: 'R', C: 'C', U: 'U',
+  };
+  return map[s] || 'M';
+}
+
+// ── Graph log ────────────────────────────────────────────────────────────────
+
+export interface GraphLine {
+  /** 'commit' has hash/message/etc; 'graph' is a connector-only row */
+  type: 'commit' | 'graph';
+  graph: string;      // the raw graph prefix characters for this row
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  date: string;
+  refs: string;       // raw --decorate string, e.g. "HEAD -> main, origin/main, tag: v1"
+}
+
+// Use a rare Unicode delimiter that won't appear in git output
+const SEP = '␞';  // ␞  (SYMBOL FOR RECORD SEPARATOR)
+const MARKER = 'GITROW␞';
+
+export function getLog(repoPath: string, page = 0, limit = 50): GraphLine[] {
+  const skip = page * limit;
+  const raw = execSync(
+    `git log --graph --pretty=format:"${MARKER}%H${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D" --skip=${skip} -n ${limit}`,
+    { cwd: repoPath, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 }
+  );
+
+  const lines = raw.split('\n');
+  const result: GraphLine[] = [];
+
+  for (const line of lines) {
+    const markerIdx = line.indexOf(MARKER);
+    if (markerIdx !== -1) {
+      const graphPrefix = line.slice(0, markerIdx);
+      const rest = line.slice(markerIdx + MARKER.length);
+      const parts = rest.split(SEP);
+      result.push({
+        type: 'commit',
+        graph: graphPrefix,
+        hash:      parts[0] ?? '',
+        shortHash: parts[1] ?? '',
+        message:   parts[2] ?? '',
+        author:    parts[3] ?? '',
+        date:      parts[4] ?? '',
+        refs:      parts[5] ?? '',
+      });
+    } else if (line.trim()) {
+      // Connector-only row (pure graph lines between commits)
+      result.push({
+        type: 'graph',
+        graph: line,
+        hash: '', shortHash: '', message: '', author: '', date: '', refs: '',
+      });
+    }
+  }
+  return result;
+}
+
+// ── Diff ─────────────────────────────────────────────────────────────────────
+
+export async function getDiff(
+  repoPath: string,
+  file?: string,
+  commit?: string
+): Promise<string> {
+  const git = getGit(repoPath);
+  if (commit) {
+    return file
+      ? git.show([`${commit}`, '--', file])
+      : git.show([commit, '--stat', '-p']);
+  }
+  if (file) {
+    try {
+      const staged = await git.diff(['--cached', '--', file]);
+      if (staged) return staged;
+    } catch { /* fall through */ }
+    return git.diff(['--', file]);
+  }
+  return git.diff();
+}
+
+// ── Branches ─────────────────────────────────────────────────────────────────
+
+export interface BranchInfo {
+  name: string;
+  current: boolean;
+  remote: boolean;
+  lastCommit?: string;
+  lastCommitDate?: string;
+}
+
+export async function getBranches(repoPath: string): Promise<BranchInfo[]> {
+  const git = getGit(repoPath);
+  const result = await git.branch([
+    '-a', '--sort=-committerdate',
+    '--format=%(refname:short)|%(HEAD)|%(committerdate:relative)|%(subject)',
+  ]);
+  return result.all.map((line) => {
+    const parts = line.split('|');
+    return {
+      name: parts[0],
+      current: parts[1] === '*',
+      remote: parts[0].startsWith('remotes/') || parts[0].startsWith('origin/'),
+      lastCommitDate: parts[2],
+      lastCommit: parts[3],
+    };
+  });
+}
+
+export async function checkoutBranch(repoPath: string, branch: string): Promise<void> {
+  await getGit(repoPath).checkout(branch);
+}
+
+// ── Stash ────────────────────────────────────────────────────────────────────
+
+export interface StashEntry { index: number; message: string; date?: string; }
+
+export async function getStash(repoPath: string): Promise<StashEntry[]> {
+  const git = getGit(repoPath);
+  const result = await git.stashList();
+  return (result.all || []).map((s: LogResult['all'][0], i: number) => ({
+    index: i, message: s.message, date: s.date,
+  }));
+}
+
+export async function applyStash(repoPath: string, index: number): Promise<void> {
+  await getGit(repoPath).stash(['apply', `stash@{${index}}`]);
+}
+
+export async function dropStash(repoPath: string, index: number): Promise<void> {
+  await getGit(repoPath).stash(['drop', `stash@{${index}}`]);
+}
+
+// ── Remote ops ───────────────────────────────────────────────────────────────
+
+export async function fetchRepo(repoPath: string): Promise<string> {
+  const result = await getGit(repoPath).fetch();
+  return JSON.stringify(result);
+}
+
+export async function pullRepo(repoPath: string): Promise<string> {
+  const result = await getGit(repoPath).pull();
+  return `${result.summary.changes} changes, ${result.summary.insertions} insertions, ${result.summary.deletions} deletions`;
+}
