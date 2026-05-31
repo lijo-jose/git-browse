@@ -4,10 +4,22 @@ A local Git repository browser built with Next.js. Browse commits, inspect diffs
 
 ## Features
 
-- Three-panel layout: file tree, git log/status, and diff viewer
-- Browse commit history and staged/unstaged changes
+- Three-panel layout: file tree, git log/status, and diff viewer — both the Explorer sidebar and Diff panel are independently collapsible
+- Browse commit history with an inline expandable file list per commit — click a commit to see all changed files with full paths, click a file to diff it, click again to collapse
+- Browse staged/unstaged changes with per-file diffs
 - Side-by-side diff view for any file or commit
 - Remembers the last opened repository across sessions
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `E` | Toggle Explorer sidebar |
+| `D` | Toggle Diff panel |
+| `L` | Switch to Log tab |
+| `B` | Switch to Branches tab |
+| `C` | Switch to Changes tab |
+| `R` | Refresh current repository |
 
 ## Getting Started
 

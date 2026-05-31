@@ -18,6 +18,7 @@ export default function Home() {
   const [selectedFileStaged, setSelectedFileStaged] = useState(false);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>();
   const [showDiff, setShowDiff] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   const handleRepoSelect = (path: string) => {
     setRepo(path);
@@ -33,6 +34,7 @@ export default function Home() {
     else if (e.key.toLowerCase() === 'l') setActiveTab('log');
     else if (e.key.toLowerCase() === 'c') setActiveTab('changes');
     else if (e.key.toLowerCase() === 'd') setShowDiff(v => !v);
+    else if (e.key.toLowerCase() === 'e') setShowSidebar(v => !v);
   }, [repo]);
 
   useEffect(() => {
@@ -45,16 +47,33 @@ export default function Home() {
       <TopBar repo={repo} onRepoSelect={handleRepoSelect} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Left — file explorer */}
-        <aside className="w-52 flex-shrink-0 flex flex-col border-r border-zinc-800/60 bg-zinc-900">
-          <SectionHeader>Explorer</SectionHeader>
-          <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} />
+        {/* Left — file explorer (collapsible) */}
+        <aside className={`flex-shrink-0 flex flex-col border-r border-zinc-800/60 bg-zinc-900 transition-all duration-200 overflow-hidden ${showSidebar ? 'w-52' : 'w-0 border-r-0'}`}>
+          <div className="w-52 flex flex-col h-full">
+            <SectionHeader onToggle={() => setShowSidebar(false)} />
+            <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} />
+          </div>
         </aside>
 
-        {/* Middle — git panel; expands when diff is hidden */}
+        {/* Middle — git panel */}
         <section className={`flex flex-col border-r border-zinc-800/60 bg-zinc-900 min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
-          <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
-            <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Repository</span>
+          <div className="h-9 flex items-center justify-between px-2 border-b border-zinc-800/60 flex-shrink-0 gap-1">
+            <div className="flex items-center gap-1">
+              {/* Sidebar toggle */}
+              {!showSidebar && (
+                <button
+                  onClick={() => setShowSidebar(true)}
+                  title="Show explorer (E)"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                >
+                  <SidebarIcon open={false} />
+                  <span className="text-[10px] font-medium">Explorer</span>
+                </button>
+              )}
+              {showSidebar && (
+                <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase px-2">Repository</span>
+              )}
+            </div>
             {/* Toggle diff panel */}
             <button
               onClick={() => setShowDiff(v => !v)}
@@ -101,9 +120,9 @@ export default function Home() {
       <footer className="h-6 flex items-center gap-4 px-4 bg-blue-600 text-blue-50 text-[10px] font-medium tracking-wide flex-shrink-0">
         <span>R — refresh</span>
         <span className="opacity-40">·</span>
-        <span>B — branches · L — log · C — changes</span>
+        <span>E — explorer · D — diff</span>
         <span className="opacity-40">·</span>
-        <span>D — toggle diff</span>
+        <span>B — branches · L — log · C — changes</span>
         <span className="opacity-40">·</span>
         <span>Right-click folder — pin</span>
         <div className="ml-auto flex items-center gap-3">
@@ -123,11 +142,31 @@ export default function Home() {
   );
 }
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function SectionHeader({ onToggle }: { onToggle: () => void }) {
   return (
-    <div className="h-9 flex items-center px-4 border-b border-zinc-800/60 flex-shrink-0">
-      <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">{children}</span>
+    <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
+      <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Explorer</span>
+      <button
+        onClick={onToggle}
+        title="Hide explorer (E)"
+        className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-700 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+      >
+        <SidebarIcon open={true} />
+      </button>
     </div>
+  );
+}
+
+function SidebarIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="1" width="14" height="14" rx="2"/>
+      <line x1="5" y1="1" x2="5" y2="15"/>
+      {open
+        ? <path d="M3 5.5L0.5 8 3 10.5" transform="translate(0.5,0)"/>
+        : <path d="M7 5.5L9.5 8 7 10.5" transform="translate(0.5,0)"/>
+      }
+    </svg>
   );
 }
 
