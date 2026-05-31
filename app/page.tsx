@@ -10,19 +10,14 @@ import { Toaster } from '@/components/ui/sonner';
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
 export default function Home() {
-  const [repo, setRepo] = useState<string | null>(null);
+  const [repo, setRepo] = useState<string | null>(() => {
+    try { return localStorage.getItem(LAST_REPO_KEY); } catch { return null; }
+  });
   const [activeTab, setActiveTab] = useState('log');
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [selectedFileStaged, setSelectedFileStaged] = useState(false);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>();
   const [showDiff, setShowDiff] = useState(true);
-
-  useEffect(() => {
-    try {
-      const last = localStorage.getItem(LAST_REPO_KEY);
-      if (last) setRepo(last);
-    } catch {}
-  }, []);
 
   const handleRepoSelect = (path: string) => {
     setRepo(path);

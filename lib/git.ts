@@ -131,7 +131,7 @@ export async function getBranches(repoPath: string): Promise<BranchInfo[]> {
   // Use NUL as field separator and newline as record separator to avoid any
   // clash with pipe characters that appear in commit subjects.
   const raw = execSync(
-    'git branch -a --sort=-committerdate --format=%(refname:short)%00%(HEAD)%00%(committerdate:relative)%00%(subject)',
+    "git branch -a --sort=-committerdate --format='%(refname:short)%00%(HEAD)%00%(committerdate:relative)%00%(subject)'",
     { cwd: repoPath, encoding: 'utf8' }
   );
   return raw.split('\n').filter(Boolean).map((line) => {

@@ -26,9 +26,13 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
   }, []);
 
   useEffect(() => {
-    load(cur);
+    // If a repo is already active (restored from localStorage), show its parent folder
+    const initialDir = selectedRepo
+      ? selectedRepo.split('/').slice(0, -1).join('/') || '/'
+      : cur;
+    load(initialDir);
     try { const s = localStorage.getItem(FAV_KEY); if (s) setFavs(JSON.parse(s)); } catch {}
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (e: FsEntry) => {
     if (e.isGitRepo) onRepoSelect(e.path);

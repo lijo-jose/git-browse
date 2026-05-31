@@ -15,6 +15,12 @@ export default function DiffViewer({ repo, file, commit, staged }: Props) {
   const [commitFiles, setCommitFiles] = useState<string[]>([]);
   const [selFile, setSelFile] = useState<string | null>(null);
 
+  // Reset file selection whenever the active commit changes
+  useEffect(() => {
+    setSelFile(null);
+    setCommitFiles([]);
+  }, [commit]);
+
   useEffect(() => {
     if (!repo || (!file && !commit)) { setRaw(''); return; }
     setLoading(true); setError('');
@@ -28,10 +34,9 @@ export default function DiffViewer({ repo, file, commit, staged }: Props) {
       .then(d => {
         if (d.error) { setError(d.error); return; }
         setRaw(d.diff || '');
+        // Populate file tabs but don't auto-select — show full diff by default
         if (commit && !file) {
-          const files = extractFiles(d.diff || '');
-          setCommitFiles(files);
-          if (files.length && !selFile) setSelFile(files[0]);
+          setCommitFiles(extractFiles(d.diff || ''));
         }
       })
       .catch(e => setError(String(e)))
@@ -76,6 +81,11 @@ export default function DiffViewer({ repo, file, commit, staged }: Props) {
       {/* Commit file tabs */}
       {commit && !file && commitFiles.length > 0 && (
         <div className="flex gap-1 px-3 py-1.5 border-b border-zinc-800/60 overflow-x-auto flex-shrink-0">
+          <button onClick={() => setSelFile(null)}
+            className={`text-[10px] font-mono px-2 py-1 rounded-md whitespace-nowrap transition-colors ${
+              selFile === null ? 'bg-zinc-700 text-zinc-200 ring-1 ring-zinc-600' : 'text-zinc-600 hover:text-zinc-300 bg-zinc-800/60'
+            }`}>All</button>
+          <span className="w-px bg-zinc-800 my-0.5 flex-shrink-0" />
           {commitFiles.map(cf => (
             <button key={cf} onClick={() => setSelFile(cf)}
               className={`text-[10px] font-mono px-2 py-1 rounded-md whitespace-nowrap transition-colors ${
@@ -172,7 +182,7 @@ function parseDiff(raw: string): DiffLine[] {
       const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)/);
       if (m) { ol = +m[1]; nl = +m[2]; }
       result.push({ type: 'header', content: line });
-    } else if (/^(diff |index |--- |\+\+\+ |commit |Author|Date)/.test(line)) {
+    } else if (/^(diff |index |--- |\+\+\+ |commit |Author:|Date:|    )/.test(line) || line === '') {
       result.push({ type: 'meta', content: line });
     } else if (line.startsWith('+')) {
       result.push({ type: 'add', content: line.slice(1), newLine: nl++ });

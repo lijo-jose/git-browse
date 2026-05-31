@@ -36,7 +36,7 @@ export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, o
       <TabsList className="h-9 flex-shrink-0 bg-transparent rounded-none border-b border-zinc-800/60 px-1 justify-start gap-0 w-full overflow-x-auto">
         {TABS.map(t => (
           <TabsTrigger key={t.value} value={t.value}
-            className="relative h-9 px-3.5 text-[11px] font-medium rounded-none bg-transparent shrink-0
+            className="relative h-9 px-3.5 text-[11px] font-medium rounded-none bg-transparent shrink-0 flex-none
               text-zinc-600 hover:text-zinc-300 data-[state=active]:text-zinc-100 data-[state=active]:bg-transparent
               transition-colors shadow-none
               after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full
