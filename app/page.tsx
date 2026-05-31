@@ -15,6 +15,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [selectedFileStaged, setSelectedFileStaged] = useState(false);
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>();
+  const [showDiff, setShowDiff] = useState(true);
 
   useEffect(() => {
     try {
@@ -36,6 +37,7 @@ export default function Home() {
     else if (e.key.toLowerCase() === 'b') setActiveTab('branches');
     else if (e.key.toLowerCase() === 'l') setActiveTab('log');
     else if (e.key.toLowerCase() === 'c') setActiveTab('changes');
+    else if (e.key.toLowerCase() === 'd') setShowDiff(v => !v);
   }, [repo]);
 
   useEffect(() => {
@@ -54,24 +56,49 @@ export default function Home() {
           <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} />
         </aside>
 
-        {/* Middle — git panel */}
-        <section className="w-[320px] flex-shrink-0 flex flex-col border-r border-zinc-800/60 bg-zinc-900 min-h-0">
+        {/* Middle — git panel; expands when diff is hidden */}
+        <section className={`flex flex-col border-r border-zinc-800/60 bg-zinc-900 min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
+          <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
+            <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Repository</span>
+            {/* Toggle diff panel */}
+            <button
+              onClick={() => setShowDiff(v => !v)}
+              title={showDiff ? 'Hide diff panel (D)' : 'Show diff panel (D)'}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            >
+              <PanelIcon open={showDiff} />
+              <span className="text-[10px] font-medium">{showDiff ? 'Hide diff' : 'Show diff'}</span>
+            </button>
+          </div>
           <GitPanel
             repo={repo || ''}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            onFileSelect={(f, s) => { setSelectedFile(f); setSelectedFileStaged(s); setSelectedCommit(undefined); }}
-            onCommitSelect={(h) => { setSelectedCommit(h); setSelectedFile(undefined); }}
+            onFileSelect={(f, s) => { setSelectedFile(f); setSelectedFileStaged(s); setSelectedCommit(undefined); if (!showDiff) setShowDiff(true); }}
+            onCommitSelect={(h) => { setSelectedCommit(h); setSelectedFile(undefined); if (!showDiff) setShowDiff(true); }}
             selectedFile={selectedFile}
             selectedCommit={selectedCommit}
           />
         </section>
 
-        {/* Right — diff */}
-        <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-zinc-950">
-          <SectionHeader>Diff</SectionHeader>
-          <DiffPanel repo={repo || ''} file={selectedFile} commit={selectedCommit} staged={selectedFileStaged} />
-        </section>
+        {/* Right — diff (collapsible) */}
+        {showDiff && (
+          <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-zinc-950">
+            <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
+              <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Diff</span>
+              <button
+                onClick={() => setShowDiff(false)}
+                title="Hide diff panel (D)"
+                className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-700 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M9 3L3 9M3 3l6 6"/>
+                </svg>
+              </button>
+            </div>
+            <DiffPanel repo={repo || ''} file={selectedFile} commit={selectedCommit} staged={selectedFileStaged} />
+          </section>
+        )}
       </div>
 
       {/* Status bar */}
@@ -79,6 +106,8 @@ export default function Home() {
         <span>R — refresh</span>
         <span className="opacity-40">·</span>
         <span>B — branches · L — log · C — changes</span>
+        <span className="opacity-40">·</span>
+        <span>D — toggle diff</span>
         <span className="opacity-40">·</span>
         <span>Right-click folder — pin</span>
       </footer>
@@ -93,5 +122,18 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     <div className="h-9 flex items-center px-4 border-b border-zinc-800/60 flex-shrink-0">
       <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">{children}</span>
     </div>
+  );
+}
+
+function PanelIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="1" width="14" height="14" rx="2"/>
+      <line x1="9" y1="1" x2="9" y2="15"/>
+      {open
+        ? <path d="M12 5.5l2.5 2.5-2.5 2.5"/>
+        : <path d="M11 5.5L8.5 8 11 10.5"/>
+      }
+    </svg>
   );
 }
