@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# git-tree
+
+A local Git repository browser built with Next.js. Browse commits, inspect diffs, and navigate your repo's file tree — all in a clean three-panel UI.
+
+## Features
+
+- Three-panel layout: file tree, git log/status, and diff viewer
+- Browse commit history and staged/unstaged changes
+- Side-by-side diff view for any file or commit
+- Remembers the last opened repository across sessions
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies and start the dev server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Building
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+The project uses `output: standalone` — the build produces a self-contained bundle in `.next/standalone/` that can be run without re-installing dependencies.
 
-To learn more about Next.js, take a look at the following resources:
+## Releases
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Releases are built automatically via GitHub Actions:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Tag push** — push a `v*` tag to trigger a build and attach the release package to a GitHub Release:
+  ```bash
+  git tag v1.0.0 && git push origin v1.0.0
+  ```
+- **Manual** — trigger the `Release` workflow from the GitHub Actions UI to produce a downloadable artifact.
 
-## Deploy on Vercel
+The release tarball contains the standalone Next.js bundle and is runnable with:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+tar -xzf git-tree-v1.0.0.tar.gz
+node server.js
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tech Stack
+
+- [Next.js 16](https://nextjs.org) with React 19
+- [Tailwind CSS v4](https://tailwindcss.com)
+- [simple-git](https://github.com/steveukx/git-js) for Git operations
+- [shadcn/ui](https://ui.shadcn.com) components
+
+## License
+
+MIT
