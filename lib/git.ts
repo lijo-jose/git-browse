@@ -214,6 +214,28 @@ export async function commitChanges(repoPath: string, message: string, all: bool
     : `Committed: ${result.commit}`;
 }
 
+// ── Tag ───────────────────────────────────────────────────────────────────────
+
+export interface TagInfo { name: string; date: string; subject: string; }
+
+export async function getTags(repoPath: string): Promise<TagInfo[]> {
+  const raw = execSync(
+    "git tag --sort=-creatordate --format='%(refname:short)%00%(creatordate:relative)%00%(subject)'",
+    { cwd: repoPath, encoding: 'utf8' }
+  );
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [name, date, ...subjectParts] = line.split('\x00');
+    return { name, date, subject: subjectParts.join('\x00') };
+  });
+}
+
+export async function createAndPushTag(repoPath: string, tag: string): Promise<string> {
+  const git = getGit(repoPath);
+  await git.tag([tag]);
+  await git.push(['origin', tag]);
+  return `Tagged and pushed: ${tag}`;
+}
+
 // ── Push ──────────────────────────────────────────────────────────────────────
 
 export async function pushBranch(

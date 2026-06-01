@@ -15,7 +15,13 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const [tagMode, setTagMode] = useState(false);
+  const [tagName, setTagName] = useState('');
+  const [tagOpen, setTagOpen] = useState(false);
+  const [tags, setTags] = useState<{ name: string; date: string; subject: string }[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const tagRef = useRef<HTMLDivElement>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!repo) { setBranch(''); setRepoName(''); return; }
@@ -36,10 +42,53 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
 
   useEffect(() => {
     try { setRecent(JSON.parse(localStorage.getItem('git-browser-recent') || '[]')); } catch {}
-    const fn = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const fn = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (tagRef.current && !tagRef.current.contains(e.target as Node)) setTagOpen(false);
+    };
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, []);
+
+  const loadTags = () => {
+    if (!repo) return;
+    fetch(`/api/git/tag?repo=${encodeURIComponent(repo)}`)
+      .then(r => r.json())
+      .then(d => setTags(d.tags || []))
+      .catch(() => {});
+  };
+
+  const openTagMode = () => {
+    setTagOpen(false);
+    setTagMode(true);
+    setTagName('');
+    setTimeout(() => tagInputRef.current?.focus(), 0);
+  };
+
+  const toggleTagOpen = () => {
+    if (!tagOpen) loadTags();
+    setTagOpen(v => !v);
+  };
+
+  const submitTag = async () => {
+    const t = tagName.trim();
+    if (!t || !repo) return;
+    setTagMode(false);
+    setTagName('');
+    setBusy('tag');
+    try {
+      const res = await fetch('/api/git/tag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, tag: t }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Tag pushed', { description: data.result || 'Done' });
+    } catch (e) {
+      toast.error('Tag failed', { description: String(e) });
+    } finally { setBusy(null); }
+  };
 
   const run = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
@@ -137,6 +186,64 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
             {busy === id ? '…' : label}
           </button>
         ))}
+        {tagMode ? (
+          <form onSubmit={e => { e.preventDefault(); submitTag(); }} className="flex items-center gap-1">
+            <input
+              ref={tagInputRef}
+              value={tagName}
+              onChange={e => setTagName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setTagMode(false); setTagName(''); } }}
+              placeholder="v1.0.0"
+              className="h-7 w-24 px-2 rounded-md text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+            />
+            <button type="submit" disabled={!tagName.trim()}
+              className="h-7 px-2 rounded-md text-xs font-medium text-primary hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Push
+            </button>
+            <button type="button" onClick={() => { setTagMode(false); setTagName(''); }}
+              className="h-7 px-2 rounded-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+            >
+              ✕
+            </button>
+          </form>
+        ) : (
+          <div className="relative" ref={tagRef}>
+            <div className="flex items-center">
+              <button
+                disabled={!repo || busy !== null}
+                onClick={openTagMode}
+                className="h-7 px-3 rounded-l-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                {busy === 'tag' ? '…' : 'Tag'}
+              </button>
+              <button
+                disabled={!repo || busy !== null}
+                onClick={toggleTagOpen}
+                className="h-7 px-1 rounded-r-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-[var(--border-subtle)]/40"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
+              </button>
+            </div>
+            {tagOpen && (
+              <div className="absolute right-0 top-9 z-50 w-64 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden">
+                <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Tags</div>
+                {tags.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-[var(--text-dim)]">No tags found</div>
+                ) : (
+                  <div className="max-h-52 overflow-y-auto pb-1.5">
+                    {tags.map(t => (
+                      <div key={t.name} className="flex flex-col px-3 py-1.5 hover:bg-[var(--bg-raised)] transition-colors">
+                        <span className="text-xs font-medium text-foreground">{t.name}</span>
+                        {t.date && <span className="text-[10px] text-[var(--text-dim)]">{t.date}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
