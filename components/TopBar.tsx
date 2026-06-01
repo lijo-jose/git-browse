@@ -7,9 +7,10 @@ import ThemeToggle from './ThemeToggle';
 interface TopBarProps {
   repo: string | null;
   onRepoSelect: (path: string) => void;
+  onOpenGuide: () => void;
 }
 
-export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
+export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps) {
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -172,6 +173,17 @@ export default function TopBar({ repo, onRepoSelect }: TopBarProps) {
       </div>
 
       <ThemeToggle />
+
+      <button
+        onClick={onOpenGuide}
+        title="User Guide"
+        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="8" cy="8" r="7"/>
+          <path d="M8 7v4M8 5v.5"/>
+        </svg>
+      </button>
 
       <div className="w-px h-4 bg-[var(--border-subtle)]" />
 

@@ -6,6 +6,7 @@ import GitPanel from '@/components/panels/GitPanel';
 import DiffPanel from '@/components/panels/DiffPanel';
 import TopBar from '@/components/TopBar';
 import { Toaster } from '@/components/ui/sonner';
+import UserGuideModal, { useUserGuide } from '@/components/UserGuideModal';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
@@ -24,6 +25,7 @@ export default function Home() {
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>();
   const [showDiff, setShowDiff] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
+  const { guideOpen, openGuide, closeGuide } = useUserGuide();
 
   const handleRepoSelect = (path: string) => {
     setRepo(path);
@@ -49,7 +51,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <TopBar repo={repo} onRepoSelect={handleRepoSelect} />
+      <TopBar repo={repo} onRepoSelect={handleRepoSelect} onOpenGuide={openGuide} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left — file explorer (collapsible) */}
@@ -142,6 +144,7 @@ export default function Home() {
         </div>
       </footer>
 
+      <UserGuideModal open={guideOpen} onClose={closeGuide} />
       <Toaster theme="dark" position="bottom-right" />
     </div>
   );
