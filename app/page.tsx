@@ -10,9 +10,14 @@ import { Toaster } from '@/components/ui/sonner';
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
 export default function Home() {
-  const [repo, setRepo] = useState<string | null>(() => {
-    try { return localStorage.getItem(LAST_REPO_KEY); } catch { return null; }
-  });
+  const [repo, setRepo] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LAST_REPO_KEY);
+      if (saved) setRepo(saved);
+    } catch {}
+  }, []);
   const [activeTab, setActiveTab] = useState('log');
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [selectedFileStaged, setSelectedFileStaged] = useState(false);
@@ -43,12 +48,12 @@ export default function Home() {
   }, [handleKeyDown]);
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <TopBar repo={repo} onRepoSelect={handleRepoSelect} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left — file explorer (collapsible) */}
-        <aside className={`flex-shrink-0 flex flex-col border-r border-zinc-800/60 bg-zinc-900 transition-all duration-200 overflow-hidden ${showSidebar ? 'w-52' : 'w-0 border-r-0'}`}>
+        <aside className={`flex-shrink-0 flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] transition-all duration-200 overflow-hidden ${showSidebar ? 'w-52' : 'w-0 border-r-0'}`}>
           <div className="w-52 flex flex-col h-full">
             <SectionHeader onToggle={() => setShowSidebar(false)} />
             <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} />
@@ -56,29 +61,29 @@ export default function Home() {
         </aside>
 
         {/* Middle — git panel */}
-        <section className={`flex flex-col border-r border-zinc-800/60 bg-zinc-900 min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
-          <div className="h-9 flex items-center justify-between px-2 border-b border-zinc-800/60 flex-shrink-0 gap-1">
+        <section className={`flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
+          <div className="h-9 flex items-center justify-between px-2 border-b border-[var(--border-subtle)]/60 flex-shrink-0 gap-1">
             <div className="flex items-center gap-1">
               {/* Sidebar toggle */}
               {!showSidebar && (
                 <button
                   onClick={() => setShowSidebar(true)}
                   title="Show explorer (E)"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
                 >
                   <SidebarIcon open={false} />
                   <span className="text-[10px] font-medium">Explorer</span>
                 </button>
               )}
               {showSidebar && (
-                <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase px-2">Repository</span>
+                <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase px-2">Repository</span>
               )}
             </div>
             {/* Toggle diff panel */}
             <button
               onClick={() => setShowDiff(v => !v)}
               title={showDiff ? 'Hide diff panel (D)' : 'Show diff panel (D)'}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
             >
               <PanelIcon open={showDiff} />
               <span className="text-[10px] font-medium">{showDiff ? 'Hide diff' : 'Show diff'}</span>
@@ -98,13 +103,13 @@ export default function Home() {
 
         {/* Right — diff (collapsible) */}
         {showDiff && (
-          <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-zinc-950">
-            <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
-              <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Diff</span>
+          <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-background">
+            <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-subtle)]/60 flex-shrink-0">
+              <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Diff</span>
               <button
                 onClick={() => setShowDiff(false)}
                 title="Hide diff panel (D)"
-                className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-700 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <path d="M9 3L3 9M3 3l6 6"/>
@@ -117,7 +122,7 @@ export default function Home() {
       </div>
 
       {/* Status bar */}
-      <footer className="h-6 flex items-center gap-4 px-4 bg-blue-600 text-blue-50 text-[10px] font-medium tracking-wide flex-shrink-0">
+      <footer className="h-6 flex items-center gap-4 px-4 text-[10px] font-medium tracking-wide flex-shrink-0" style={{ background: 'var(--statusbar-bg)', color: 'oklch(0.97 0 0)' }}>
         <span>R — refresh</span>
         <span className="opacity-40">·</span>
         <span>E — explorer · D — diff</span>
@@ -144,12 +149,12 @@ export default function Home() {
 
 function SectionHeader({ onToggle }: { onToggle: () => void }) {
   return (
-    <div className="h-9 flex items-center justify-between px-4 border-b border-zinc-800/60 flex-shrink-0">
-      <span className="text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Explorer</span>
+    <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-subtle)]/60 flex-shrink-0">
+      <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Explorer</span>
       <button
         onClick={onToggle}
         title="Hide explorer (E)"
-        className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-700 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+        className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
       >
         <SidebarIcon open={true} />
       </button>

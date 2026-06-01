@@ -12,7 +12,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
   const [cur, setCur] = useState('~');
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [favs, setFavs] = useState<{ name: string; path: string }[]>([]);
+  const [favs, setFavs] = useState<{ name: string; path: string; isGitRepo?: boolean }[]>([]);
   const [resolved, setResolved] = useState('');
 
   const load = useCallback(async (p: string) => {
@@ -26,7 +26,6 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
   }, []);
 
   useEffect(() => {
-    // If a repo is already active (restored from localStorage), show its parent folder
     const initialDir = selectedRepo
       ? selectedRepo.split('/').slice(0, -1).join('/') || '/'
       : cur;
@@ -43,7 +42,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
   const nav = (i: number) => { const p = '/' + crumbs.slice(0, i + 1).join('/'); setCur(p); load(p); };
 
   const pin = (e: FsEntry) => {
-    const next = [...favs.filter(f => f.path !== e.path), { name: e.name, path: e.path }];
+    const next = [...favs.filter(f => f.path !== e.path), { name: e.name, path: e.path, isGitRepo: e.isGitRepo }];
     setFavs(next); localStorage.setItem(FAV_KEY, JSON.stringify(next));
   };
   const unpin = (path: string) => {
@@ -55,28 +54,32 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Pinned */}
       {favs.length > 0 && (
-        <div className="border-b border-zinc-800/60 py-1.5">
-          <p className="px-4 mb-1 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">Pinned</p>
+        <div className="py-1.5" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+          <p className="px-4 mb-1 text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--text-dim)' }}>Pinned</p>
           {favs.map(f => (
-            <div key={f.path} className="group flex items-center gap-2 mx-2 px-2 py-1 rounded-lg cursor-pointer hover:bg-zinc-800/50 transition-colors"
-              onClick={() => { setCur(f.path); load(f.path); }}>
-              <FolderIcon className="text-blue-400" />
-              <span className="text-xs text-zinc-300 font-medium truncate flex-1">{f.name}</span>
+            <div key={f.path} className="group flex items-center gap-2 mx-2 px-2 py-1 rounded-lg cursor-pointer transition-colors"
+              style={{}}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+              onClick={() => { onRepoSelect(f.path); setCur(f.path); load(f.path); }}>
+              <FolderIcon className="text-blue-500" />
+              <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--foreground)' }}>{f.name}</span>
               <button onClick={e => { e.stopPropagation(); unpin(f.path); }}
-                className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-rose-400 transition-all text-[10px] w-4">✕</button>
+                className="opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all text-[10px] w-4"
+                style={{ color: 'var(--text-dim)' }}>✕</button>
             </div>
           ))}
         </div>
       )}
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-0.5 px-4 py-2 border-b border-zinc-800/60 overflow-x-auto">
+      <div className="flex items-center gap-0.5 px-4 py-2 overflow-x-auto" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
         <button onClick={() => { setCur('~'); load('~'); }}
-          className="text-[11px] text-blue-400 hover:text-blue-300 font-medium shrink-0 transition-colors">~</button>
+          className="text-[11px] font-medium shrink-0 transition-colors text-blue-500 hover:text-blue-400">~</button>
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center shrink-0">
-            <span className="text-zinc-700 mx-0.5 text-[11px]">/</span>
-            <button onClick={() => nav(i)} className="text-[11px] text-blue-400 hover:text-blue-300 font-medium max-w-[60px] truncate transition-colors">{c}</button>
+            <span className="mx-0.5 text-[11px]" style={{ color: 'var(--text-dim)' }}>/</span>
+            <button onClick={() => nav(i)} className="text-[11px] font-medium max-w-[60px] truncate transition-colors text-blue-500 hover:text-blue-400">{c}</button>
           </span>
         ))}
       </div>
@@ -84,24 +87,29 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
       {/* Entries */}
       <div className="flex-1 overflow-y-auto py-1.5 px-2">
         {loading
-          ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-7 mb-0.5 rounded-lg bg-zinc-800/50" />)
+          ? Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-7 mb-0.5 rounded-lg" style={{ background: 'color-mix(in oklch, var(--bg-raised) 50%, transparent)' }} />
+          ))
           : entries.map(e => (
             <div key={e.path}
-              className={`group flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                selectedRepo === e.path ? 'bg-blue-500/10 ring-1 ring-blue-500/20' : 'hover:bg-zinc-800/50'
-              }`}
+              className="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors"
+              style={{
+                background: selectedRepo === e.path ? 'color-mix(in oklch, var(--primary) 10%, transparent)' : undefined,
+                outline: selectedRepo === e.path ? '1px solid color-mix(in oklch, var(--primary) 20%, transparent)' : undefined,
+              }}
+              onMouseEnter={ev => { if (selectedRepo !== e.path) (ev.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
+              onMouseLeave={ev => { if (selectedRepo !== e.path) (ev.currentTarget as HTMLElement).style.background = ''; }}
               onClick={() => go(e)}
               onContextMenu={ev => { ev.preventDefault(); if (e.isDirectory) pin(e); }}
               title={e.isDirectory ? 'Right-click to pin' : e.name}
             >
-              {e.isGitRepo ? <RepoIcon /> : e.isDirectory ? <FolderIcon className="text-zinc-400" /> : <FileIcon name={e.name} />}
-              <span className={`text-xs truncate flex-1 font-medium ${
-                e.isDirectory ? 'text-zinc-300' : 'text-zinc-500'
-              } ${selectedRepo === e.path ? '!text-blue-300' : ''}`}>
+              {e.isGitRepo ? <RepoIcon /> : e.isDirectory ? <FolderIcon className="text-[var(--text-soft)]" /> : <FileIcon name={e.name} />}
+              <span className="text-xs truncate flex-1 font-medium"
+                style={{ color: selectedRepo === e.path ? 'var(--primary)' : e.isDirectory ? 'var(--foreground)' : 'var(--text-dim)' }}>
                 {e.name}
               </span>
               {e.isGitRepo && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 tracking-wide flex-shrink-0">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/20 tracking-wide flex-shrink-0">
                   GIT
                 </span>
               )}
@@ -123,7 +131,7 @@ function FolderIcon({ className = '' }: { className?: string }) {
 
 function RepoIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-400 flex-shrink-0">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
       <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/>
       <circle cx="11" cy="3.5" r="1.5"/>
       <line x1="5" y1="5" x2="5" y2="11"/><path d="M5 6a3 3 0 003 3h2"/>
@@ -134,14 +142,14 @@ function RepoIcon() {
 function FileIcon({ name }: { name: string }) {
   const ext = name.split('.').pop()?.toLowerCase() || '';
   const colors: Record<string, string> = {
-    ts: 'text-blue-400', tsx: 'text-blue-400',
-    js: 'text-amber-400', jsx: 'text-amber-400',
-    py: 'text-emerald-400', go: 'text-cyan-400',
-    rs: 'text-orange-400', css: 'text-pink-400',
-    md: 'text-zinc-400', json: 'text-yellow-400',
+    ts: 'text-blue-500', tsx: 'text-blue-500',
+    js: 'text-amber-500', jsx: 'text-amber-500',
+    py: 'text-emerald-500', go: 'text-cyan-500',
+    rs: 'text-orange-500', css: 'text-pink-500',
+    md: 'text-[var(--text-soft)]', json: 'text-yellow-500',
   };
   return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className={`flex-shrink-0 ${colors[ext] || 'text-zinc-600'}`}>
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className={`flex-shrink-0 ${colors[ext] || 'text-[var(--text-dim)]'}`}>
       <path d="M4 0h5.5l4.5 4.5V14a2 2 0 01-2 2H4a2 2 0 01-2-2V2a2 2 0 012-2zm5 0v4.5H14L9 0z"/>
     </svg>
   );

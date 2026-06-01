@@ -22,7 +22,7 @@ const TABS = [
 
 export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, onCommitFileSelect, selectedFile, selectedCommit }: Props) {
   if (!repo) return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-700">
+    <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'var(--text-dim)' }}>
       <svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" className="opacity-40">
         <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/>
         <circle cx="11" cy="3.5" r="1.5"/><line x1="5" y1="5" x2="5" y2="11"/>
@@ -34,14 +34,15 @@ export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, o
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="flex flex-col h-full min-h-0">
-      <TabsList className="h-9 flex-shrink-0 bg-transparent rounded-none border-b border-zinc-800/60 px-1 justify-start gap-0 w-full overflow-x-auto">
+      <TabsList className="h-9 flex-shrink-0 bg-transparent rounded-none px-1 justify-start gap-0 w-full overflow-x-auto" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
         {TABS.map(t => (
           <TabsTrigger key={t.value} value={t.value}
             className="relative h-9 px-3.5 text-[11px] font-medium rounded-none bg-transparent shrink-0 flex-none
-              text-zinc-600 hover:text-zinc-300 data-[state=active]:text-zinc-100 data-[state=active]:bg-transparent
               transition-colors shadow-none
               after:absolute after:bottom-0 after:left-2 after:right-2 after:h-[2px] after:rounded-full
-              after:bg-transparent data-[state=active]:after:bg-blue-500">
+              after:bg-transparent data-[state=active]:after:bg-primary"
+            style={{ color: 'var(--text-dim)' }}
+          >
             {t.label}
           </TabsTrigger>
         ))}

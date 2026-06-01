@@ -22,7 +22,7 @@ export default function StashList({ repo }: { repo: string }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [repo]);
+  useEffect(() => { load(); }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (index: number, action: 'apply' | 'drop') => {
     setActing(index);
@@ -38,31 +38,34 @@ export default function StashList({ repo }: { repo: string }) {
 
   if (loading) return (
     <div className="p-3 space-y-1">
-      {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg bg-zinc-800/50" />)}
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="h-14 rounded-lg" style={{ background: 'color-mix(in oklch, var(--bg-raised) 60%, transparent)' }} />
+      ))}
     </div>
   );
-  if (error) return <p className="p-4 text-rose-400 text-xs">{error}</p>;
+  if (error) return <p className="p-4 text-rose-500 text-xs">{error}</p>;
   if (!stashes.length) return (
     <div className="flex items-center justify-center h-full">
-      <p className="text-xs text-zinc-700 font-medium">No stashes</p>
+      <p className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>No stashes</p>
     </div>
   );
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
       {stashes.map(s => (
-        <div key={s.index} className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-xl bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 transition-colors">
+        <div key={s.index} className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-xl transition-colors"
+          style={{ background: 'var(--bg-panel)', outline: '1px solid var(--border-subtle)' }}>
           <div className="min-w-0">
-            <p className="text-xs text-zinc-300 font-medium truncate">{s.message}</p>
-            {s.date && <p className="text-[10px] text-zinc-600 mt-0.5">{s.date}</p>}
+            <p className="text-xs font-medium truncate" style={{ color: 'var(--foreground)' }}>{s.message}</p>
+            {s.date && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-dim)' }}>{s.date}</p>}
           </div>
           <div className="flex gap-1 flex-shrink-0">
             <button disabled={acting !== null} onClick={() => act(s.index, 'apply')}
-              className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition-colors">
+              className="text-[11px] font-medium text-emerald-600 hover:text-emerald-500 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition-colors">
               Apply
             </button>
             <button disabled={acting !== null} onClick={() => act(s.index, 'drop')}
-              className="text-[11px] font-medium text-rose-400 hover:text-rose-300 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-rose-500/10 transition-colors">
+              className="text-[11px] font-medium text-rose-600 hover:text-rose-500 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-rose-500/10 transition-colors">
               Drop
             </button>
           </div>

@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 interface GraphLine {
   type: 'commit' | 'graph';
   graph: string;
@@ -12,18 +10,13 @@ interface GraphLine {
 }
 
 interface CommitFile { path: string; status: string; }
-
 interface Ref { label: string; kind: 'head' | 'local' | 'remote' | 'tag'; }
-
-// ── Layout constants ─────────────────────────────────────────────────────────
 
 const COL = 16;
 const COMMIT_H = 30;
 const CONN_H = 12;
 const R = 4.5;
 const SW = 1.5;
-
-// ── Branch colours ───────────────────────────────────────────────────────────
 
 const COLORS = [
   '#3b82f6', '#f59e0b', '#10b981', '#f43f5e', '#8b5cf6',
@@ -32,8 +25,6 @@ const COLORS = [
 
 function col2x(col: number) { return col * COL + COL / 2; }
 function branchColor(col: number) { return COLORS[col % COLORS.length]; }
-
-// ── SVG graph slice ───────────────────────────────────────────────────────────
 
 function GraphSVG({ graphStr, isCommit, height }: { graphStr: string; isCommit: boolean; height: number }) {
   const maxCols = Math.max(Math.ceil(graphStr.length / 2) + 1, 2);
@@ -84,7 +75,7 @@ function GraphSVG({ graphStr, isCommit, height }: { graphStr: string; isCommit: 
     const x = col2x(nodeCol);
     const color = branchColor(nodeCol);
     lines.push(
-      <circle key="mask" cx={x} cy={midY} r={R + 1} fill="#18181b" />,
+      <circle key="mask" cx={x} cy={midY} r={R + 1} fill="var(--bg-panel)" />,
       <circle key="ring" cx={x} cy={midY} r={R} fill="none" stroke={color} strokeWidth={2} />,
       <circle key="dot" cx={x} cy={midY} r={2} fill={color} />,
     );
@@ -96,8 +87,6 @@ function GraphSVG({ graphStr, isCommit, height }: { graphStr: string; isCommit: 
     </svg>
   );
 }
-
-// ── Ref pills ────────────────────────────────────────────────────────────────
 
 function parseRefs(raw: string): Ref[] {
   if (!raw.trim()) return [];
@@ -111,10 +100,10 @@ function parseRefs(raw: string): Ref[] {
 }
 
 const REF_CLS: Record<Ref['kind'], string> = {
-  head:   'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25',
-  local:  'bg-blue-500/15    text-blue-400    ring-1 ring-blue-500/25',
-  remote: 'bg-amber-500/15   text-amber-400   ring-1 ring-amber-500/25',
-  tag:    'bg-violet-500/15  text-violet-400  ring-1 ring-violet-500/25',
+  head:   'bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/25',
+  local:  'bg-blue-500/15    text-blue-600    ring-1 ring-blue-500/25',
+  remote: 'bg-amber-500/15   text-amber-600   ring-1 ring-amber-500/25',
+  tag:    'bg-violet-500/15  text-violet-600  ring-1 ring-violet-500/25',
 };
 
 function RefPills({ raw }: { raw: string }) {
@@ -131,23 +120,19 @@ function RefPills({ raw }: { raw: string }) {
   );
 }
 
-// ── Status badge ─────────────────────────────────────────────────────────────
-
 const STATUS_CLS: Record<string, string> = {
-  M: 'text-amber-400',
-  A: 'text-emerald-400',
-  D: 'text-rose-400',
-  R: 'text-blue-400',
-  C: 'text-cyan-400',
+  M: 'text-amber-500',
+  A: 'text-emerald-500',
+  D: 'text-rose-500',
+  R: 'text-blue-500',
+  C: 'text-cyan-500',
 };
 
 function StatusBadge({ status }: { status: string }) {
   const letter = status[0] ?? 'M';
-  const cls = STATUS_CLS[letter] ?? 'text-zinc-400';
-  return <span className={`font-mono text-[10px] font-bold w-4 flex-shrink-0 ${cls}`}>{letter}</span>;
+  const cls = STATUS_CLS[letter] ?? '';
+  return <span className={`font-mono text-[10px] font-bold w-4 flex-shrink-0 ${cls}`} style={!cls ? { color: 'var(--text-soft)' } : {}}>{letter}</span>;
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
   repo: string;
@@ -165,9 +150,7 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
   const [error, setError] = useState('');
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // expandedCommit: which commit node is expanded (showing file list)
   const [expandedCommit, setExpandedCommit] = useState<string | undefined>();
-  // cache of commit -> files
   const [fileCache, setFileCache] = useState<Record<string, CommitFile[] | 'loading'>>({});
 
   const loadPage = useCallback(async (p: number, reset = false) => {
@@ -202,11 +185,7 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
   }, [hasMore, loading, page, loadPage]);
 
   const handleCommitClick = useCallback(async (hash: string) => {
-    if (expandedCommit === hash) {
-      // collapse
-      setExpandedCommit(undefined);
-      return;
-    }
+    if (expandedCommit === hash) { setExpandedCommit(undefined); return; }
     setExpandedCommit(hash);
     onCommitSelect(hash);
     if (!fileCache[hash]) {
@@ -221,12 +200,12 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
     }
   }, [expandedCommit, fileCache, repo, onCommitSelect]);
 
-  if (error) return <div className="p-4 text-rose-400 text-xs">{error}</div>;
+  if (error) return <div className="p-4 text-rose-500 text-xs">{error}</div>;
 
   if (!lines.length && loading) return (
     <div className="p-3 space-y-px">
       {Array.from({ length: 18 }).map((_, i) => (
-        <Skeleton key={i} className="h-[30px] rounded-none bg-zinc-800/40" style={{ opacity: 1 - i * 0.04 }} />
+        <Skeleton key={i} className="h-[30px] rounded-none" style={{ opacity: 1 - i * 0.04, background: 'color-mix(in oklch, var(--bg-raised) 50%, transparent)' }} />
       ))}
     </div>
   );
@@ -251,57 +230,55 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
 
         return (
           <div key={line.hash || idx}>
-            {/* Commit row */}
             <div
-              style={{ height: rowH }}
-              className={`group flex items-center gap-3 px-3 cursor-pointer transition-colors ${
-                isExpanded || isSelected ? 'bg-blue-500/8' : 'hover:bg-zinc-800/40'
-              }`}
+              style={{
+                height: rowH,
+                background: isExpanded || isSelected ? 'color-mix(in oklch, var(--primary) 8%, transparent)' : undefined,
+              }}
+              className="group flex items-center gap-3 px-3 cursor-pointer transition-colors hover:[background:color-mix(in_oklch,var(--bg-raised)_50%,transparent)]"
               onClick={() => handleCommitClick(line.hash)}
             >
               <GraphSVG graphStr={line.graph} isCommit height={rowH} />
 
-              {/* Chevron */}
               <svg
                 width="10" height="10" viewBox="0 0 10 10" fill="none"
                 stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
-                className={`flex-shrink-0 text-zinc-600 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+                className={`flex-shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+                style={{ color: 'var(--text-dim)' }}
               >
                 <path d="M3 2l4 3-4 3" />
               </svg>
 
-              <span className="font-mono text-[10px] text-zinc-600 w-[46px] flex-shrink-0 tabular-nums group-hover:text-zinc-500">
+              <span className="font-mono text-[10px] w-[46px] flex-shrink-0 tabular-nums" style={{ color: 'var(--text-dim)' }}>
                 {line.shortHash}
               </span>
 
               {line.refs && <RefPills raw={line.refs} />}
 
-              <span className={`text-[12px] font-medium flex-1 truncate min-w-0 leading-tight transition-colors ${
-                isExpanded || isSelected ? 'text-zinc-100' : 'text-zinc-400 group-hover:text-zinc-200'
-              }`}>
+              <span className={`text-[12px] font-medium flex-1 truncate min-w-0 leading-tight transition-colors`}
+                style={{ color: isExpanded || isSelected ? 'var(--foreground)' : 'var(--text-soft)' }}>
                 {line.message}
               </span>
 
-              <span className="text-[10px] text-zinc-700 w-16 flex-shrink-0 text-right truncate hidden xl:block">
+              <span className="text-[10px] w-16 flex-shrink-0 text-right truncate hidden xl:block" style={{ color: 'var(--text-dim)' }}>
                 {line.author.split(' ')[0]}
               </span>
 
-              <span className="text-[10px] text-zinc-700 w-14 flex-shrink-0 text-right whitespace-nowrap">
+              <span className="text-[10px] w-14 flex-shrink-0 text-right whitespace-nowrap" style={{ color: 'var(--text-dim)' }}>
                 {line.date}
               </span>
             </div>
 
-            {/* Expanded file list */}
             {isExpanded && (
-              <div className="border-b border-zinc-800/40 bg-zinc-900/60">
+              <div style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 50%, transparent)', background: 'color-mix(in oklch, var(--bg-panel) 70%, transparent)' }}>
                 {files === 'loading' || files === undefined ? (
                   <div className="px-10 py-2 space-y-1">
                     {Array.from({ length: 3 }).map((_, i) => (
-                      <Skeleton key={i} className="h-5 rounded bg-zinc-800/50" />
+                      <Skeleton key={i} className="h-5 rounded" style={{ background: 'color-mix(in oklch, var(--bg-raised) 60%, transparent)' }} />
                     ))}
                   </div>
                 ) : files.length === 0 ? (
-                  <div className="px-10 py-2 text-[11px] text-zinc-600">No files changed</div>
+                  <div className="px-10 py-2 text-[11px]" style={{ color: 'var(--text-dim)' }}>No files changed</div>
                 ) : (
                   <div className="py-1">
                     {files.map((f, fi) => {
@@ -309,13 +286,14 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
                       return (
                         <div
                           key={fi}
-                          className={`flex items-center gap-2 px-10 py-[3px] cursor-pointer transition-colors ${
-                            isFileSelected ? 'bg-blue-500/12 text-zinc-100' : 'text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200'
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCommitFileSelect(line.hash, f.path);
+                          className="flex items-center gap-2 px-10 py-[3px] cursor-pointer transition-colors"
+                          style={{
+                            background: isFileSelected ? 'color-mix(in oklch, var(--primary) 10%, transparent)' : undefined,
+                            color: isFileSelected ? 'var(--foreground)' : 'var(--text-soft)',
                           }}
+                          onMouseEnter={e => { if (!isFileSelected) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
+                          onMouseLeave={e => { if (!isFileSelected) (e.currentTarget as HTMLElement).style.background = ''; }}
+                          onClick={(e) => { e.stopPropagation(); onCommitFileSelect(line.hash, f.path); }}
                         >
                           <StatusBadge status={f.status} />
                           <span className="font-mono text-[11px] truncate min-w-0">{f.path}</span>
@@ -331,7 +309,7 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
       })}
 
       <div ref={loaderRef} className="h-8 flex items-center justify-center">
-        {loading && <span className="text-[11px] text-zinc-700">Loading…</span>}
+        {loading && <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Loading…</span>}
       </div>
     </div>
   );

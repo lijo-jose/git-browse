@@ -41,28 +41,38 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
 
   if (loading) return (
     <div className="p-3 space-y-1">
-      {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg bg-zinc-800/50" />)}
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-10 rounded-lg" style={{ background: 'color-mix(in oklch, var(--bg-raised) 60%, transparent)' }} />
+      ))}
     </div>
   );
-  if (error) return <p className="p-4 text-rose-400 text-xs">{error}</p>;
+  if (error) return <p className="p-4 text-rose-500 text-xs">{error}</p>;
 
   const local = branches.filter(b => !b.remote);
   const remote = branches.filter(b => b.remote);
 
   const Row = (b: Branch) => (
     <div key={b.name}
-      className={`group mx-2 px-3 py-2 rounded-lg cursor-pointer transition-colors mb-0.5 ${
-        b.current ? 'bg-emerald-500/8 ring-1 ring-emerald-500/15' : 'hover:bg-zinc-800/50'
-      }`}
+      className="group mx-2 px-3 py-2 rounded-lg cursor-pointer transition-colors mb-0.5"
+      style={{
+        background: b.current ? 'color-mix(in oklch, oklch(0.64 0.17 150) 8%, transparent)' : undefined,
+        outline: b.current ? '1px solid color-mix(in oklch, oklch(0.64 0.17 150) 15%, transparent)' : undefined,
+      }}
+      onMouseEnter={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
+      onMouseLeave={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = ''; }}
       onClick={() => !b.current && !b.remote && setConfirm(b.name)}
     >
       <div className="flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${b.current ? 'bg-emerald-400' : b.remote ? 'bg-amber-400/40' : 'bg-zinc-600'}`} />
-        <span className={`text-xs font-medium truncate flex-1 ${b.current ? 'text-emerald-300' : 'text-zinc-300'}`}>{b.name}</span>
-        {b.current && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25 tracking-wide">HEAD</span>}
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+          background: b.current ? 'oklch(0.74 0.17 150)' : b.remote ? 'oklch(0.78 0.14 80 / 0.4)' : 'var(--text-dim)',
+        }} />
+        <span className="text-xs font-medium truncate flex-1" style={{ color: b.current ? 'oklch(0.74 0.17 150)' : 'var(--foreground)' }}>{b.name}</span>
+        {b.current && (
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-wide bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/25">HEAD</span>
+        )}
       </div>
       {b.lastCommit && (
-        <p className="text-[10px] text-zinc-600 truncate mt-0.5 pl-3.5">{b.lastCommit}</p>
+        <p className="text-[10px] truncate mt-0.5 pl-3.5" style={{ color: 'var(--text-dim)' }}>{b.lastCommit}</p>
       )}
     </div>
   );
@@ -70,22 +80,20 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
   return (
     <>
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
-        {local.length > 0 && (
-          <><Label>Local</Label>{local.map(Row)}</>
-        )}
-        {remote.length > 0 && (
-          <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>
-        )}
+        {local.length > 0 && <><Label>Local</Label>{local.map(Row)}</>}
+        {remote.length > 0 && <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>}
       </div>
 
       <Dialog open={!!confirm} onOpenChange={() => setConfirm(null)}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 shadow-2xl">
+        <DialogContent className="shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold">Switch Branch</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-zinc-400">Switch to <span className="font-mono text-blue-400">{confirm}</span>?</p>
+          <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+            Switch to <span className="font-mono text-blue-500">{confirm}</span>?
+          </p>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirm(null)} className="text-zinc-400 hover:text-zinc-100 text-xs">Cancel</Button>
+            <Button variant="ghost" onClick={() => setConfirm(null)} className="text-xs">Cancel</Button>
             <Button onClick={checkout} disabled={busy} className="bg-blue-600 hover:bg-blue-500 text-white text-xs">
               {busy ? 'Switching…' : 'Checkout'}
             </Button>
@@ -97,5 +105,9 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
 }
 
 function Label({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <p className={`px-4 py-1 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase ${className}`}>{children}</p>;
+  return (
+    <p className={`px-4 py-1 text-[10px] font-semibold tracking-widest uppercase ${className}`} style={{ color: 'var(--text-dim)' }}>
+      {children}
+    </p>
+  );
 }
