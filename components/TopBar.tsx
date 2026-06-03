@@ -3,19 +3,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import ThemeToggle from './ThemeToggle';
+import DirPicker from './ui/DirPicker';
 
 interface TopBarProps {
   repo: string | null;
   onRepoSelect: (path: string) => void;
+  onCloned?: (repoPath: string) => void;
   onOpenGuide: () => void;
 }
 
-export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps) {
+export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneRemote, setCloneRemote] = useState('');
+  const [cloneDir, setCloneDir] = useState('~');
+  const [cloneName, setCloneName] = useState('');
+  const [dirPickerOpen, setDirPickerOpen] = useState(false);
+  const cloneRemoteRef = useRef<HTMLInputElement>(null);
+  const [branchPickPath, setBranchPickPath] = useState<string | null>(null);
+  const [branchPickList, setBranchPickList] = useState<string[]>([]);
+  const [branchFilter, setBranchFilter] = useState('');
+  const [branchBusy, setBranchBusy] = useState(false);
+  const [cloneProgress, setCloneProgress] = useState<string | null>(null);
   const [tagMode, setTagMode] = useState(false);
   const [tagName, setTagName] = useState('');
   const [tagOpen, setTagOpen] = useState(false);
@@ -91,6 +104,60 @@ export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps)
     } finally { setBusy(null); }
   };
 
+  const openClone = () => {
+    setCloneOpen(true);
+    setCloneRemote('');
+    setCloneName('');
+    setTimeout(() => cloneRemoteRef.current?.focus(), 0);
+  };
+
+  const submitClone = async () => {
+    const remote = cloneRemote.trim();
+    const dir = cloneDir.trim();
+    if (!remote || !dir) return;
+    setCloneOpen(false);
+    setBusy('clone');
+    setCloneProgress(remote);
+    try {
+      const res = await fetch('/api/git/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remote, directory: dir, name: cloneName.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setCloneProgress(null);
+      toast.success('Cloned successfully', { description: data.path });
+      onCloned?.(data.path);
+      onRepoSelect(data.path);
+      // fetch branches for step-2 picker
+      const br = await fetch(`/api/git/branches?repo=${encodeURIComponent(data.path)}`).then(r => r.json()).catch(() => ({}));
+      const names: string[] = (br.branches || []).map((b: { name: string }) => b.name);
+      setBranchPickPath(data.path);
+      setBranchPickList(names);
+      setBranchFilter('');
+    } catch (e) {
+      setCloneProgress(null);
+      toast.error('Clone failed', { description: String(e) });
+    } finally { setBusy(null); }
+  };
+
+  const checkoutAfterClone = async (branchName: string) => {
+    if (!branchPickPath) return;
+    setBranchBusy(true);
+    try {
+      const res = await fetch(`/api/git/checkout?repo=${encodeURIComponent(branchPickPath)}&branch=${encodeURIComponent(branchName)}`, { method: 'POST' });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      toast.success(`Checked out ${branchName}`);
+    } catch (e) {
+      toast.error('Checkout failed', { description: String(e) });
+    } finally {
+      setBranchBusy(false);
+      setBranchPickPath(null);
+    }
+  };
+
   const run = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     setBusy(action);
@@ -136,6 +203,7 @@ export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps)
   };
 
   return (
+    <>
     <header className="h-11 flex items-center gap-3 px-4 bg-[var(--bg-panel)] border-b border-[var(--border-subtle)]/60 flex-shrink-0 select-none">
       {/* Brand */}
       <div className="flex items-center gap-2">
@@ -209,6 +277,127 @@ export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps)
 
       {/* Actions */}
       <div className="flex items-center gap-1">
+        <button
+          onClick={openClone}
+          disabled={busy !== null}
+          className="h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          {busy === 'clone' ? '…' : 'Clone'}
+        </button>
+
+        {cloneOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setCloneOpen(false)}>
+            <div className="bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl w-[400px] p-5" onClick={e => e.stopPropagation()}>
+              <h2 className="text-sm font-semibold text-foreground mb-4">Clone Repository</h2>
+              <form onSubmit={e => { e.preventDefault(); submitClone(); }} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-[var(--text-dim)] uppercase tracking-wide">Remote URL *</label>
+                  <input
+                    ref={cloneRemoteRef}
+                    value={cloneRemote}
+                    onChange={e => setCloneRemote(e.target.value)}
+                    placeholder="https://github.com/user/repo.git"
+                    className="h-8 px-3 rounded-lg text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-[var(--text-dim)] uppercase tracking-wide">Directory *</label>
+                  <div className="relative">
+                    <div className="flex gap-1">
+                      <input
+                        value={cloneDir}
+                        onChange={e => setCloneDir(e.target.value)}
+                        placeholder="~/projects"
+                        className="flex-1 h-8 px-3 rounded-lg text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDirPickerOpen(v => !v)}
+                        className="h-8 px-3 rounded-lg text-xs font-medium bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-soft)] hover:text-foreground hover:border-primary transition-colors flex items-center gap-1.5"
+                      >
+                        <FolderOpenIcon />
+                        Browse
+                      </button>
+                    </div>
+                    {dirPickerOpen && (
+                      <DirPicker
+                        value={cloneDir}
+                        onChange={p => setCloneDir(p)}
+                        onClose={() => setDirPickerOpen(false)}
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-[var(--text-dim)] uppercase tracking-wide">Name <span className="normal-case tracking-normal opacity-60">(optional)</span></label>
+                  <input
+                    value={cloneName}
+                    onChange={e => setCloneName(e.target.value)}
+                    placeholder="my-project"
+                    className="h-8 px-3 rounded-lg text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setCloneOpen(false)}
+                    className="h-7 px-3 rounded-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={!cloneRemote.trim() || !cloneDir.trim()}
+                    className="h-7 px-4 rounded-md text-xs font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
+                    Clone
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {branchPickPath && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setBranchPickPath(null)}>
+            <div className="bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl w-[380px] flex flex-col overflow-hidden" style={{ maxHeight: 480 }} onClick={e => e.stopPropagation()}>
+              <div className="px-5 pt-5 pb-3 flex-shrink-0">
+                <h2 className="text-sm font-semibold text-foreground">Checkout Branch</h2>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-dim)' }}>Select a branch to checkout, or skip to stay on the default.</p>
+                <input
+                  autoFocus
+                  value={branchFilter}
+                  onChange={e => setBranchFilter(e.target.value)}
+                  placeholder="Filter branches…"
+                  className="mt-3 w-full h-8 px-3 rounded-lg text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 pb-2 min-h-0">
+                {branchPickList
+                  .filter(b => !branchFilter || b.toLowerCase().includes(branchFilter.toLowerCase()))
+                  .map(b => (
+                    <button key={b}
+                      disabled={branchBusy}
+                      onClick={() => checkoutAfterClone(b)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-left transition-colors disabled:opacity-40"
+                      style={{ color: 'var(--foreground)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 60%, transparent)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                        <circle cx="3" cy="3" r="2"/><circle cx="9" cy="9" r="2"/><path d="M3 5v1a3 3 0 003 3h.5"/>
+                      </svg>
+                      <span className="truncate font-medium">{b}</span>
+                    </button>
+                  ))}
+                {branchPickList.filter(b => !branchFilter || b.toLowerCase().includes(branchFilter.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-3 text-xs" style={{ color: 'var(--text-dim)' }}>No branches match</p>
+                )}
+              </div>
+              <div className="flex-shrink-0 px-5 py-3 flex justify-end" style={{ borderTop: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+                <button onClick={() => setBranchPickPath(null)}
+                  className="h-7 px-4 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors">
+                  Skip
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {[{ id: 'fetch', label: 'Fetch' }, { id: 'pull', label: 'Pull' }, { id: 'push', label: 'Push' }].map(({ id, label }) => (
           <button key={id}
             disabled={!repo || busy !== null}
@@ -278,5 +467,38 @@ export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps)
         )}
       </div>
     </header>
+
+    {cloneProgress && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4 w-[360px]">
+          <div className="relative w-10 h-10">
+            <svg className="animate-spin w-10 h-10" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" className="opacity-10" />
+              <path d="M20 4 A16 16 0 0 1 36 20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-primary" />
+            </svg>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+              className="absolute inset-0 m-auto text-primary">
+              <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/>
+              <circle cx="11" cy="3.5" r="1.5"/>
+              <line x1="5" y1="5" x2="5" y2="11"/><path d="M5 6a3 3 0 003 3h2"/>
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-foreground">Cloning repository…</p>
+            <p className="text-xs mt-1 break-all" style={{ color: 'var(--text-dim)' }}>{cloneProgress}</p>
+          </div>
+          <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>This may take a moment for large repositories.</p>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
+function FolderOpenIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="flex-shrink-0">
+      <path d="M1 3.5A1.5 1.5 0 012.5 2h3.764c.69 0 1.35.28 1.837.78L9 3.5h4.5A1.5 1.5 0 0115 5v.5H1V3.5zM1 7v5.5A1.5 1.5 0 002.5 14h11a1.5 1.5 0 001.5-1.5V7H1z"/>
+    </svg>
   );
 }

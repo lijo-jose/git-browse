@@ -26,6 +26,7 @@ export default function Home() {
   const [showDiff, setShowDiff] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const { guideOpen, openGuide, closeGuide } = useUserGuide();
+  const [clonedRepo, setClonedRepo] = useState<string | null>(null);
 
   const handleRepoSelect = (path: string) => {
     setRepo(path);
@@ -51,14 +52,14 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <TopBar repo={repo} onRepoSelect={handleRepoSelect} onOpenGuide={openGuide} />
+      <TopBar repo={repo} onRepoSelect={handleRepoSelect} onCloned={setClonedRepo} onOpenGuide={openGuide} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left — file explorer (collapsible) */}
         <aside className={`flex-shrink-0 flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] transition-all duration-200 overflow-hidden ${showSidebar ? 'w-52' : 'w-0 border-r-0'}`}>
           <div className="w-52 flex flex-col h-full">
             <SectionHeader onToggle={() => setShowSidebar(false)} />
-            <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} />
+            <FolderPanel onRepoSelect={handleRepoSelect} selectedRepo={repo} navigateTo={clonedRepo} />
           </div>
         </aside>
 

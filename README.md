@@ -1,4 +1,4 @@
-# git-tree
+# git-browse
 
 A local Git repository browser built with Next.js. Browse commits, inspect diffs, and navigate your repo's file tree — all in a clean three-panel UI.
 
@@ -9,6 +9,15 @@ A local Git repository browser built with Next.js. Browse commits, inspect diffs
 - Browse staged/unstaged changes with per-file diffs
 - Side-by-side diff view for any file or commit
 - Remembers the last opened repository across sessions
+- **Branch management** — create, switch, and delete branches from the Branches tab
+- **Discard changes** — discard unstaged changes per file from the Changes tab
+- **Commit graph toolbar** — visual commit graph navigation in the Log tab
+- **Repository info tab** — at-a-glance repo metadata (remotes, HEAD, stash count)
+- **Git add, commit, and push** — stage files, write a commit message, and push without leaving the UI
+- **Create and push tags** — tag a commit and push the tag to the remote
+- **Themes** — switch between light, dark, and system themes
+- **Collapsible Explorer sidebar** — pin and unpin repositories for quick access
+- **User guide** — built-in help panel with keyboard shortcuts and usage tips
 
 ## Keyboard Shortcuts
 
@@ -54,7 +63,7 @@ Releases are built automatically via GitHub Actions:
 The release tarball contains the standalone Next.js bundle and is runnable with:
 
 ```bash
-tar -xzf git-tree-v1.0.0.tar.gz
+tar -xzf git-browse-v1.0.0.tar.gz
 node server.js
 ```
 

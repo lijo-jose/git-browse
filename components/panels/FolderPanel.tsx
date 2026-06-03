@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface FsEntry { name: string; path: string; isDirectory: boolean; isGitRepo: boolean; }
-interface Props { onRepoSelect: (p: string) => void; selectedRepo: string | null; }
+interface Props { onRepoSelect: (p: string) => void; selectedRepo: string | null; navigateTo?: string | null; }
 
 const FAV_KEY = 'git-browser-favorites';
 
-export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
+export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: Props) {
   const [cur, setCur] = useState('~');
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,13 @@ export default function FolderPanel({ onRepoSelect, selectedRepo }: Props) {
     load(initialDir);
     try { const s = localStorage.getItem(FAV_KEY); if (s) setFavs(JSON.parse(s)); } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!navigateTo) return;
+    const dir = navigateTo.split('/').slice(0, -1).join('/') || '/';
+    setCur(dir);
+    load(dir);
+  }, [navigateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (e: FsEntry) => {
     if (e.isGitRepo) onRepoSelect(e.path);

@@ -138,8 +138,11 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-wide bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/25">HEAD</span>
         )}
       </div>
-      {b.lastCommit && (
-        <p className="text-[10px] truncate mt-0.5 pl-3.5" style={{ color: 'var(--text-dim)' }}>{b.lastCommit}</p>
+      {(b.lastCommit || b.lastCommitDate) && (
+        <div className="flex items-center gap-2 mt-0.5 pl-3.5">
+          {b.lastCommit && <p className="text-[10px] truncate flex-1" style={{ color: 'var(--text-dim)' }}>{b.lastCommit}</p>}
+          {b.lastCommitDate && <p className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-dim)', opacity: 0.7 }}>{b.lastCommitDate}</p>}
+        </div>
       )}
     </div>
   );

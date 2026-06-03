@@ -155,7 +155,7 @@ export async function getBranches(repoPath: string): Promise<BranchInfo[]> {
     return {
       name,
       current: head === '*',
-      remote: name.startsWith('remotes/') || name.includes('/'),
+      remote: name.startsWith('remotes/'),
       lastCommitDate: date,
       lastCommit: subjectParts.join('\x00'), // re-join in the impossible case subject had NUL
     };
@@ -339,4 +339,14 @@ export async function pushBranch(
   }
   await git.push();
   return 'Pushed successfully';
+}
+
+// ── Clone ─────────────────────────────────────────────────────────────────────
+
+export async function cloneRepo(remote: string, directory: string, name?: string): Promise<string> {
+  const git = simpleGit();
+  const dest = name?.trim() || remote.split('/').pop()?.replace(/\.git$/, '') || 'repo';
+  const cloneDir = `${directory.replace(/\/$/, '')}/${dest}`;
+  await git.clone(remote, cloneDir);
+  return cloneDir;
 }

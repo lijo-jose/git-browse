@@ -46,8 +46,8 @@ jobs:
             VERSION="${{ github.event.inputs.version }}"
           fi
 
-          tar -czf "git-tree-${VERSION}.tar.gz" -C .next/standalone .
-          echo "ARCHIVE=git-tree-${VERSION}.tar.gz" >> $GITHUB_ENV
+          tar -czf "git-browse-${VERSION}.tar.gz" -C .next/standalone .
+          echo "ARCHIVE=git-browse-${VERSION}.tar.gz" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Create GitHub Release
