@@ -56,10 +56,11 @@ export interface GraphLine {
 const SEP = '␞';  // ␞  (SYMBOL FOR RECORD SEPARATOR)
 const MARKER = 'GITROW␞';
 
-export function getLog(repoPath: string, page = 0, limit = 50): GraphLine[] {
+export function getLog(repoPath: string, page = 0, limit = 50, all = false): GraphLine[] {
   const skip = page * limit;
+  const allFlag = all ? '--all ' : '';
   const raw = execSync(
-    `git log --graph --pretty=format:"${MARKER}%H${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D" --skip=${skip} -n ${limit}`,
+    `git log --graph ${allFlag}--pretty=format:"${MARKER}%H${SEP}%h${SEP}%s${SEP}%an${SEP}%ar${SEP}%D" --skip=${skip} -n ${limit}`,
     { cwd: repoPath, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 }
   );
 
@@ -234,6 +235,94 @@ export async function createAndPushTag(repoPath: string, tag: string): Promise<s
   await git.tag([tag]);
   await git.push(['origin', tag]);
   return `Tagged and pushed: ${tag}`;
+}
+
+// ── Checkout file(s) ─────────────────────────────────────────────────────────
+
+export async function checkoutFiles(repoPath: string, files: string[]): Promise<void> {
+  await getGit(repoPath).checkout(['--', ...files]);
+}
+
+export async function checkoutAllFiles(repoPath: string): Promise<void> {
+  await getGit(repoPath).checkout(['.']);
+}
+
+// ── Create branch ─────────────────────────────────────────────────────────────
+
+export async function createBranch(repoPath: string, name: string): Promise<void> {
+  await getGit(repoPath).checkoutLocalBranch(name);
+}
+
+// ── Delete branch ─────────────────────────────────────────────────────────────
+
+export async function deleteBranch(repoPath: string, name: string, force = false): Promise<void> {
+  await getGit(repoPath).deleteLocalBranch(name, force);
+}
+
+// ── Merge ─────────────────────────────────────────────────────────────────────
+
+export async function mergeBranch(repoPath: string, branch: string): Promise<string> {
+  const result = await getGit(repoPath).merge([branch]);
+  return `Merged ${branch}: ${result.result}`;
+}
+
+// ── Rebase ────────────────────────────────────────────────────────────────────
+
+export async function rebaseBranch(repoPath: string, branch: string): Promise<string> {
+  await getGit(repoPath).rebase([branch]);
+  return `Rebased onto ${branch}`;
+}
+
+// ── Remotes / repo info ───────────────────────────────────────────────────────
+
+export interface RemoteInfo { name: string; fetchUrl: string; pushUrl: string; }
+
+export async function getRemotes(repoPath: string): Promise<RemoteInfo[]> {
+  const raw = execSync('git remote -v', { cwd: repoPath, encoding: 'utf8' });
+  const map = new Map<string, RemoteInfo>();
+  for (const line of raw.split('\n').filter(Boolean)) {
+    const m = line.match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)$/);
+    if (!m) continue;
+    const [, name, url, type] = m;
+    if (!map.has(name)) map.set(name, { name, fetchUrl: '', pushUrl: '' });
+    const entry = map.get(name)!;
+    if (type === 'fetch') entry.fetchUrl = url;
+    else entry.pushUrl = url;
+  }
+  return [...map.values()];
+}
+
+export interface RepoInfo {
+  headBranch: string;
+  headCommit: string;
+  remotes: RemoteInfo[];
+  totalCommits: number;
+  repoPath: string;
+}
+
+export async function getRepoInfo(repoPath: string): Promise<RepoInfo> {
+  const git = getGit(repoPath);
+  const [branch, rev, remotes] = await Promise.all([
+    git.revparse(['--abbrev-ref', 'HEAD']).catch(() => 'unknown'),
+    git.revparse(['--short', 'HEAD']).catch(() => ''),
+    getRemotes(repoPath),
+  ]);
+  const countRaw = execSync('git rev-list --count HEAD', { cwd: repoPath, encoding: 'utf8' }).trim();
+  return {
+    headBranch: branch.trim(),
+    headCommit: rev.trim(),
+    remotes,
+    totalCommits: parseInt(countRaw, 10) || 0,
+    repoPath,
+  };
+}
+
+// ── Stash push ────────────────────────────────────────────────────────────────
+
+export async function pushStash(repoPath: string, message?: string): Promise<string> {
+  const args = message ? ['push', '-m', message] : ['push'];
+  await getGit(repoPath).stash(args);
+  return message ? `Stashed: ${message}` : 'Stashed changes';
 }
 
 // ── Push ──────────────────────────────────────────────────────────────────────

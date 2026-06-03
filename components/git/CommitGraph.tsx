@@ -148,16 +148,18 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
+  const [allBranches, setAllBranches] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const [expandedCommit, setExpandedCommit] = useState<string | undefined>();
   const [fileCache, setFileCache] = useState<Record<string, CommitFile[] | 'loading'>>({});
 
-  const loadPage = useCallback(async (p: number, reset = false) => {
+  const loadPage = useCallback(async (p: number, reset = false, all = false) => {
     if (!repo) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/git/log?repo=${encodeURIComponent(repo)}&page=${p}`);
+      const res = await fetch(`/api/git/log?repo=${encodeURIComponent(repo)}&page=${p}&all=${all ? '1' : '0'}`);
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
       const next: GraphLine[] = data.lines || [];
@@ -170,14 +172,24 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
   useEffect(() => {
     setLines([]); setPage(0); setHasMore(true); setError('');
     setExpandedCommit(undefined); setFileCache({});
-    loadPage(0, true);
-  }, [repo]);
+    loadPage(0, true, allBranches);
+  }, [repo, allBranches]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const doFetchAll = async () => {
+    setFetching(true);
+    try {
+      await fetch(`/api/git/fetch?repo=${encodeURIComponent(repo)}`, { method: 'POST' });
+      setLines([]); setPage(0); setHasMore(true); setError('');
+      setExpandedCommit(undefined); setFileCache({});
+      await loadPage(0, true, allBranches);
+    } finally { setFetching(false); }
+  };
 
   useEffect(() => {
     if (!loaderRef.current) return;
     const obs = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore && !loading) {
-        const next = page + 1; setPage(next); loadPage(next);
+        const next = page + 1; setPage(next); loadPage(next, false, allBranches);
       }
     }, { threshold: 0.1 });
     obs.observe(loaderRef.current);
@@ -211,7 +223,52 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
   );
 
   return (
-    <div className="overflow-y-auto h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0">
+
+      {/* Toolbar */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5"
+        style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 50%, transparent)' }}>
+        <button
+          onClick={() => setAllBranches(v => !v)}
+          className="flex items-center gap-1.5 h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors"
+          style={{
+            background: allBranches
+              ? 'color-mix(in oklch, oklch(0.65 0.18 250) 15%, transparent)'
+              : 'color-mix(in oklch, var(--bg-raised) 60%, transparent)',
+            color: allBranches ? 'oklch(0.65 0.18 250)' : 'var(--text-dim)',
+            outline: allBranches ? '1px solid color-mix(in oklch, oklch(0.65 0.18 250) 30%, transparent)' : undefined,
+          }}
+        >
+          {/* branch icon */}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/>
+            <circle cx="11" cy="3.5" r="1.5"/>
+            <line x1="5" y1="5" x2="5" y2="11"/>
+            <path d="M5 5.5a3 3 0 003 3h2"/>
+          </svg>
+          All branches
+        </button>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={doFetchAll}
+          disabled={fetching}
+          className="flex items-center gap-1.5 h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors disabled:opacity-40"
+          style={{ background: 'color-mix(in oklch, var(--bg-raised) 60%, transparent)', color: 'var(--text-dim)' }}
+          title="git fetch --all, then reload graph"
+        >
+          {/* refresh icon */}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"
+            className={fetching ? 'animate-spin' : ''}>
+            <path d="M13.5 8A5.5 5.5 0 112.5 5" strokeLinecap="round"/>
+            <path d="M2.5 2v3h3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {fetching ? 'Fetching…' : 'Fetch all'}
+        </button>
+      </div>
+
+    <div className="overflow-y-auto flex-1 min-h-0">
       {lines.map((line, idx) => {
         const isCommit = line.type === 'commit';
         const rowH = isCommit ? COMMIT_H : CONN_H;
@@ -311,6 +368,7 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
       <div ref={loaderRef} className="h-8 flex items-center justify-center">
         {loading && <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Loading…</span>}
       </div>
+    </div>
     </div>
   );
 }

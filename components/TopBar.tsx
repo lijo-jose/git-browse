@@ -102,7 +102,27 @@ export default function TopBar({ repo, onRepoSelect, onOpenGuide }: TopBarProps)
           body: JSON.stringify({ repo, setUpstream: false, branch: '' }),
         });
         const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        if (data.error) {
+          const noUpstream = /no upstream|set.upstream|has no upstream/i.test(data.error);
+          if (noUpstream && branch) {
+            setBusy(null);
+            const confirmed = window.confirm(
+              `Branch "${branch}" has no upstream.\n\nRun: git push --set-upstream origin ${branch}?`
+            );
+            if (!confirmed) return;
+            setBusy('push');
+            const res2 = await fetch('/api/git/push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ repo, setUpstream: true, branch }),
+            });
+            const data2 = await res2.json();
+            if (data2.error) throw new Error(data2.error);
+            toast.success('Pushed', { description: data2.result || 'Done' });
+            return;
+          }
+          throw new Error(data.error);
+        }
         toast.success('Pushed', { description: data.result || 'Done' });
       } else {
         const res = await fetch(`/api/git/${action}?repo=${encodeURIComponent(repo)}`, { method: 'POST' });

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getLog } from '@/lib/git';
+import { getRepoInfo } from '@/lib/git';
 import { assertGitRepo } from '@/lib/validate';
 
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get('repo');
-  const page = parseInt(req.nextUrl.searchParams.get('page') || '0');
-  const all  = req.nextUrl.searchParams.get('all') === '1';
   if (!raw) return NextResponse.json({ error: 'repo required' }, { status: 400 });
   try {
     const repo = assertGitRepo(raw);
-    const lines = getLog(repo, page, 50, all);
-    return NextResponse.json({ lines });
+    const info = await getRepoInfo(repo);
+    return NextResponse.json(info);
   } catch (err: unknown) {
     return NextResponse.json({ error: String(err) }, { status: 400 });
   }

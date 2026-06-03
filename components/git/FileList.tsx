@@ -26,6 +26,8 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [staging, setStaging] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardConfirm, setDiscardConfirm] = useState<'selected' | 'all' | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
   const [pushOpen, setPushOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState('');
@@ -105,6 +107,30 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
     } catch (e) {
       toast.error('Commit failed', { description: String(e) });
     } finally { setCommitting(false); }
+  };
+
+  const doDiscard = async (all: boolean) => {
+    setDiscarding(true);
+    try {
+      const unstagedFiles = files.filter(f => !f.staged);
+      const filesToDiscard = all
+        ? unstagedFiles.map(f => f.path)
+        : [...selected].filter(p => unstagedFiles.some(f => f.path === p));
+      const body = all ? { repo, all: true } : { repo, files: filesToDiscard };
+      const res = await fetch('/api/git/checkout-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(all ? 'Discarded all changes' : `Discarded ${filesToDiscard.length} file(s)`);
+      setSelected(new Set());
+      setDiscardConfirm(null);
+      load();
+    } catch (e) {
+      toast.error('Discard failed', { description: String(e) });
+    } finally { setDiscarding(false); }
   };
 
   const doPush = async () => {
@@ -198,6 +224,17 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
             Commit…
           </button>
           <div className="flex-1" />
+          {unstaged.length > 0 && (
+            <button
+              onClick={() => setDiscardConfirm(selected.size > 0 ? 'selected' : 'all')}
+              disabled={discarding}
+              className="h-7 px-3 rounded-md text-xs font-medium transition-colors disabled:opacity-30"
+              style={{ background: 'color-mix(in oklch, oklch(0.55 0.2 25) 12%, transparent)', color: 'oklch(0.65 0.18 25)' }}
+              title={selected.size > 0 ? 'Discard selected unstaged changes' : 'Discard all unstaged changes'}
+            >
+              {selected.size > 0 ? `Discard (${selected.size})` : 'Discard all'}
+            </button>
+          )}
           <button
             onClick={() => setPushOpen(true)}
             className="h-7 px-3 rounded-md text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
@@ -270,6 +307,30 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
             <Button variant="outline" onClick={() => setPushOpen(false)} className="text-xs h-8">Cancel</Button>
             <Button onClick={doPush} disabled={pushing || (pushSetUpstream && !pushBranchName.trim())} className="text-xs h-8 bg-blue-600 hover:bg-blue-500 text-white">
               {pushing ? 'Pushing…' : pushSetUpstream ? 'Push & set upstream' : 'Push'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard confirm modal */}
+      <Dialog open={!!discardConfirm} onOpenChange={() => setDiscardConfirm(null)}>
+        <DialogContent className="sm:max-w-sm" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)' }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--foreground)' }}>Discard changes</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+            {discardConfirm === 'all'
+              ? 'Discard all unstaged changes? This cannot be undone.'
+              : `Discard changes in ${selected.size} selected file(s)? This cannot be undone.`}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscardConfirm(null)} className="text-xs h-8">Cancel</Button>
+            <Button
+              onClick={() => doDiscard(discardConfirm === 'all')}
+              disabled={discarding}
+              className="text-xs h-8 bg-rose-600 hover:bg-rose-500 text-white"
+            >
+              {discarding ? 'Discarding…' : 'Discard'}
             </Button>
           </DialogFooter>
         </DialogContent>

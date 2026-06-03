@@ -5,6 +5,7 @@ import FileList from '@/components/git/FileList';
 import CommitGraph from '@/components/git/CommitGraph';
 import BranchList from '@/components/git/BranchList';
 import StashList from '@/components/git/StashList';
+import RepoInfo from '@/components/git/RepoInfo';
 
 interface Props {
   repo: string; activeTab: string; onTabChange: (t: string) => void;
@@ -18,6 +19,7 @@ const TABS = [
   { value: 'changes', label: 'Changes' },
   { value: 'branches', label: 'Branches' },
   { value: 'stash', label: 'Stash' },
+  { value: 'info', label: 'Info' },
 ];
 
 export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, onCommitFileSelect, selectedFile, selectedCommit }: Props) {
@@ -59,6 +61,9 @@ export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, o
       </TabsContent>
       <TabsContent value="stash"    className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
         <StashList repo={repo} />
+      </TabsContent>
+      <TabsContent value="info"     className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
+        <RepoInfo repo={repo} />
       </TabsContent>
     </Tabs>
   );
