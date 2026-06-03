@@ -25,7 +25,7 @@ const SECTIONS = [
     title: 'Panels',
     items: [
       { key: 'Explorer', desc: 'Left sidebar — browse and pin local git repos' },
-      { key: 'Repository', desc: 'Middle panel — Log, Branches, Changes tabs' },
+      { key: 'Repository', desc: 'Middle panel — Log, Branches, Changes, and Info tabs' },
       { key: 'Diff', desc: 'Right panel — file diffs and commit details' },
     ],
   },
@@ -37,14 +37,48 @@ const SECTIONS = [
       { key: 'Push', desc: 'Push local commits to remote' },
       { key: 'Tag', desc: 'Create and push a new tag; click ▾ to view existing tags' },
       { key: 'Recent', desc: 'Switch between recently opened repositories' },
+      { key: 'Theme', desc: 'Switch between light, dark, and system themes' },
+    ],
+  },
+  {
+    title: 'Log Tab',
+    items: [
+      { key: 'Click commit', desc: 'Expand a commit to see all changed files; click again to collapse' },
+      { key: 'Click file', desc: 'Open the file diff for that commit in the Diff panel' },
+      { key: 'Graph', desc: 'Commit graph toolbar shows branch topology inline' },
+    ],
+  },
+  {
+    title: 'Branches Tab',
+    items: [
+      { key: 'Switch', desc: 'Click a branch to check it out' },
+      { key: 'New branch', desc: 'Create a new branch from the current HEAD' },
+      { key: 'Delete', desc: 'Delete a local branch from the branch list' },
+    ],
+  },
+  {
+    title: 'Changes Tab',
+    items: [
+      { key: 'Stage', desc: 'Stage individual files with git add' },
+      { key: 'Discard', desc: 'Discard unstaged changes for a file' },
+      { key: 'Commit', desc: 'Write a commit message and commit staged changes' },
+      { key: 'Push', desc: 'Push the new commit to the remote after committing' },
+    ],
+  },
+  {
+    title: 'Info Tab',
+    items: [
+      { key: 'Remotes', desc: 'View configured remote URLs' },
+      { key: 'HEAD', desc: 'Current branch and commit SHA' },
+      { key: 'Stashes', desc: 'Count of stashed changes' },
     ],
   },
   {
     title: 'Tips',
     items: [
       { key: 'Pin repo', desc: 'Right-click a folder in Explorer to pin it for quick access' },
-      { key: 'Click commit', desc: 'Click any commit in Log to see its diff in the Diff panel' },
-      { key: 'Click file', desc: 'Click a changed file in Changes to diff it against HEAD' },
+      { key: 'Clone', desc: 'Clone a remote repository directly from the Explorer sidebar' },
+      { key: 'Last repo', desc: 'GitBrowse remembers the last opened repository across sessions' },
     ],
   },
 ];
