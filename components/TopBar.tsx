@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import ThemeToggle from './ThemeToggle';
 import DirPicker from './ui/DirPicker';
 
@@ -261,6 +262,18 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       </div>
 
       <ThemeToggle />
+
+      <Link
+        href="/compare"
+        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+        title="Compare files/folders"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 6H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3"/>
+          <rect x="11" y="3" width="10" height="10" rx="2"/>
+        </svg>
+        Compare
+      </Link>
 
       <button
         onClick={onOpenGuide}

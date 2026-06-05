@@ -218,9 +218,17 @@
   }
 }
 
-/* ── Scrollbars ── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+/* ── Scrollbars (default: thin) ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 9px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+
+/* ── Diff area: more visible scrollbar ── */
+.diff-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.diff-scroll::-webkit-scrollbar-track { background: color-mix(in oklch, var(--border-subtle) 40%, transparent); border-radius: 9px; }
+.diff-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar-hover); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+.diff-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--primary) 60%, var(--scrollbar-hover)); border: 2px solid transparent; background-clip: padding-box; }
+.diff-scroll::-webkit-scrollbar-corner { background: transparent; }
+.diff-scroll { scrollbar-width: auto; scrollbar-color: var(--scrollbar-hover) color-mix(in oklch, var(--border-subtle) 40%, transparent); }
