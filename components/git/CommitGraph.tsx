@@ -328,6 +328,12 @@ export default function CommitGraph({ repo, onCommitSelect, onCommitFileSelect, 
 
             {isExpanded && (
               <div style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 50%, transparent)', background: 'color-mix(in oklch, var(--bg-panel) 70%, transparent)' }}>
+                <div className="px-10 py-1.5 flex items-center gap-1.5" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 30%, transparent)' }}>
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-dim)', flexShrink: 0 }}>
+                    <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6"/>
+                  </svg>
+                  <span className="text-[11px]" style={{ color: 'var(--text-soft)' }}>{line.author}</span>
+                </div>
                 {files === 'loading' || files === undefined ? (
                   <div className="px-10 py-2 space-y-1">
                     {Array.from({ length: 3 }).map((_, i) => (

@@ -8,6 +8,7 @@ interface Props {
   rightPath: string;
   relativePath: string;
   status: 'left-only' | 'right-only' | 'identical' | 'modified';
+  rawDiff?: string;
 }
 
 type ViewMode = 'unified' | 'split';
@@ -25,8 +26,8 @@ interface Chunk {
   startIndex: number; // index in flat lines array
 }
 
-export default function FileDiffViewer({ leftPath, rightPath, relativePath, status }: Props) {
-  const [diff, setDiff] = useState('');
+export default function FileDiffViewer({ leftPath, rightPath, relativePath, status, rawDiff }: Props) {
+  const [diff, setDiff] = useState(rawDiff ?? '');
   const [leftContent, setLeftContent] = useState('');
   const [rightContent, setRightContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,7 @@ export default function FileDiffViewer({ leftPath, rightPath, relativePath, stat
   const [saveMsg, setSaveMsg] = useState('');
 
   useEffect(() => {
+    if (rawDiff !== undefined) { setDiff(rawDiff); return; }
     if (!leftPath && !rightPath) return;
     setLoading(true);
     setError('');
@@ -56,7 +58,7 @@ export default function FileDiffViewer({ leftPath, rightPath, relativePath, stat
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [leftPath, rightPath]);
+  }, [leftPath, rightPath, rawDiff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lines = parseDiff(diff);
   const chunks = extractChunks(lines);
@@ -128,7 +130,7 @@ export default function FileDiffViewer({ leftPath, rightPath, relativePath, stat
     } catch (e) { setSaveMsg(String(e)); } finally { setSaving(false); }
   };
 
-  if (!leftPath && !rightPath) return (
+  if (!leftPath && !rightPath && rawDiff === undefined) return (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
       <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center opacity-50">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -166,7 +168,7 @@ export default function FileDiffViewer({ leftPath, rightPath, relativePath, stat
             }`}>{saveMsg}</span>
           )}
 
-          {status !== 'identical' && (
+          {status !== 'identical' && rawDiff === undefined && (
             <>
               {/* Copy-all group */}
               <div className="flex items-center rounded-lg overflow-hidden ring-1 ring-border">

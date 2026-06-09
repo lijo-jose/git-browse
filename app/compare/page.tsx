@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import FileDiffViewer from '@/components/compare/FileDiffViewer';
 import ClipboardDiffViewer from '@/components/compare/ClipboardDiffViewer';
 import HistoryPanel from '@/components/compare/HistoryPanel';
@@ -86,8 +86,18 @@ export default function ComparePage() {
 
 /* ── Folders mode ── */
 function FoldersMode() {
+  const didInit = useRef(false);
   const [leftDir, setLeftDir] = useState('');
   const [rightDir, setRightDir] = useState('');
+
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const l = params.get('left'); const r = params.get('right');
+    if (l) setLeftDir(l);
+    if (r) setRightDir(r);
+  }, []);
   const [entries, setEntries] = useState<CompareEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

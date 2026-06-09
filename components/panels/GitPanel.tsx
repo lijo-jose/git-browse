@@ -12,6 +12,7 @@ interface Props {
   onFileSelect: (f: string, s: boolean) => void; onCommitSelect: (h: string) => void;
   onCommitFileSelect: (hash: string, file: string) => void;
   selectedFile?: string; selectedCommit?: string;
+  onCompare?: (branch: string) => void;
 }
 
 const TABS = [
@@ -22,7 +23,7 @@ const TABS = [
   { value: 'info', label: 'Info' },
 ];
 
-export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, onCommitFileSelect, selectedFile, selectedCommit }: Props) {
+export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, onCommitSelect, onCommitFileSelect, selectedFile, selectedCommit, onCompare }: Props) {
   if (!repo) return (
     <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'var(--text-dim)' }}>
       <svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" className="opacity-40">
@@ -57,7 +58,7 @@ export default function GitPanel({ repo, activeTab, onTabChange, onFileSelect, o
         <FileList repo={repo} onFileSelect={onFileSelect} selectedFile={selectedFile} />
       </TabsContent>
       <TabsContent value="branches" className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
-        <BranchList repo={repo} />
+        <BranchList repo={repo} onCompare={onCompare} />
       </TabsContent>
       <TabsContent value="stash"    className="flex-1 overflow-hidden m-0 data-[state=active]:flex flex-col min-h-0">
         <StashList repo={repo} />

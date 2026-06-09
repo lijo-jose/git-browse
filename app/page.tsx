@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState } from 'react';
 import FolderPanel from '@/components/panels/FolderPanel';
 import GitPanel from '@/components/panels/GitPanel';
 import DiffPanel from '@/components/panels/DiffPanel';
+import InlineCompare from '@/components/git/InlineCompare';
 import TopBar from '@/components/TopBar';
 import { Toaster } from '@/components/ui/sonner';
 import UserGuideModal, { useUserGuide } from '@/components/UserGuideModal';
@@ -27,6 +28,7 @@ export default function Home() {
   const [showSidebar, setShowSidebar] = useState(true);
   const { guideOpen, openGuide, closeGuide } = useUserGuide();
   const [clonedRepo, setClonedRepo] = useState<string | null>(null);
+  const [compareBase, setCompareBase] = useState<string | null>(null); // null = off, string = compare mode
 
   const handleRepoSelect = (path: string) => {
     setRepo(path);
@@ -63,64 +65,93 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* Middle — git panel */}
-        <section className={`flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
-          <div className="h-9 flex items-center justify-between px-2 border-b border-[var(--border-subtle)]/60 flex-shrink-0 gap-1">
-            <div className="flex items-center gap-1">
-              {/* Sidebar toggle */}
-              {!showSidebar && (
-                <button
-                  onClick={() => setShowSidebar(true)}
-                  title="Show explorer (E)"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-                >
-                  <SidebarIcon open={false} />
-                  <span className="text-[10px] font-medium">Explorer</span>
-                </button>
-              )}
-              {showSidebar && (
-                <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase px-2">Repository</span>
-              )}
-            </div>
-            {/* Toggle diff panel */}
-            <button
-              onClick={() => setShowDiff(v => !v)}
-              title={showDiff ? 'Hide diff panel (D)' : 'Show diff panel (D)'}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-            >
-              <PanelIcon open={showDiff} />
-              <span className="text-[10px] font-medium">{showDiff ? 'Hide diff' : 'Show diff'}</span>
-            </button>
-          </div>
-          <GitPanel
-            repo={repo || ''}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onFileSelect={(f, s) => { setSelectedFile(f); setSelectedFileStaged(s); setSelectedCommit(undefined); if (!showDiff) setShowDiff(true); }}
-            onCommitSelect={(h) => { setSelectedCommit(h); setSelectedFile(undefined); if (!showDiff) setShowDiff(true); }}
-            onCommitFileSelect={(h, f) => { setSelectedCommit(h); setSelectedFile(f); if (!showDiff) setShowDiff(true); }}
-            selectedFile={selectedFile}
-            selectedCommit={selectedCommit}
-          />
-        </section>
-
-        {/* Right — diff (collapsible) */}
-        {showDiff && (
-          <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-background">
-            <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-subtle)]/60 flex-shrink-0">
-              <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Diff</span>
-              <button
-                onClick={() => setShowDiff(false)}
-                title="Hide diff panel (D)"
-                className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M9 3L3 9M3 3l6 6"/>
-                </svg>
-              </button>
-            </div>
-            <DiffPanel repo={repo || ''} file={selectedFile} commit={selectedCommit} staged={selectedFileStaged} />
+        {compareBase !== null ? (
+          /* ── Compare mode: replaces both Repository and Diff panels ── */
+          <section className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+            <InlineCompare
+              repo={repo || ''}
+              initialBase={compareBase}
+              onClose={() => setCompareBase(null)}
+            />
           </section>
+        ) : (
+          <>
+            {/* Middle — git panel */}
+            <section className={`flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
+              <div className="h-9 flex items-center justify-between px-2 border-b border-[var(--border-subtle)]/60 flex-shrink-0 gap-1">
+                <div className="flex items-center gap-1">
+                  {!showSidebar && (
+                    <button
+                      onClick={() => setShowSidebar(true)}
+                      title="Show explorer (E)"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+                    >
+                      <SidebarIcon open={false} />
+                      <span className="text-[10px] font-medium">Explorer</span>
+                    </button>
+                  )}
+                  {showSidebar && (
+                    <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase px-2">Repository</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  {/* Git Compare shortcut */}
+                  {repo && (
+                    <button
+                      onClick={() => setCompareBase('')}
+                      title="Compare branches / commits"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="4" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="12" cy="3" r="1.5"/>
+                        <line x1="4" y1="4.5" x2="4" y2="11.5"/><path d="M4 7a4 4 0 004 4h3"/>
+                      </svg>
+                      <span className="text-[10px] font-medium">Compare</span>
+                    </button>
+                  )}
+                  {/* Toggle diff panel */}
+                  <button
+                    onClick={() => setShowDiff(v => !v)}
+                    title={showDiff ? 'Hide diff panel (D)' : 'Show diff panel (D)'}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+                  >
+                    <PanelIcon open={showDiff} />
+                    <span className="text-[10px] font-medium">{showDiff ? 'Hide diff' : 'Show diff'}</span>
+                  </button>
+                </div>
+              </div>
+              <GitPanel
+                repo={repo || ''}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onFileSelect={(f, s) => { setSelectedFile(f); setSelectedFileStaged(s); setSelectedCommit(undefined); if (!showDiff) setShowDiff(true); }}
+                onCommitSelect={(h) => { setSelectedCommit(h); setSelectedFile(undefined); if (!showDiff) setShowDiff(true); }}
+                onCommitFileSelect={(h, f) => { setSelectedCommit(h); setSelectedFile(f); if (!showDiff) setShowDiff(true); }}
+                selectedFile={selectedFile}
+                selectedCommit={selectedCommit}
+                onCompare={(branch) => { setCompareBase(branch); }}
+              />
+            </section>
+
+            {/* Right — diff (collapsible) */}
+            {showDiff && (
+              <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-background">
+                <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-subtle)]/60 flex-shrink-0">
+                  <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Diff</span>
+                  <button
+                    onClick={() => setShowDiff(false)}
+                    title="Hide diff panel (D)"
+                    className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M9 3L3 9M3 3l6 6"/>
+                    </svg>
+                  </button>
+                </div>
+                <DiffPanel repo={repo || ''} file={selectedFile} commit={selectedCommit} staged={selectedFileStaged} />
+              </section>
+            )}
+          </>
         )}
       </div>
 

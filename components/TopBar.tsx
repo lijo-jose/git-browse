@@ -275,6 +275,21 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         Compare
       </Link>
 
+      <Link
+        href={repo ? `/git-compare?repo=${encodeURIComponent(repo)}` : '/git-compare'}
+        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+        title="Compare branches / commits"
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="4" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/>
+          <circle cx="12" cy="3" r="1.5"/>
+          <line x1="4" y1="4.5" x2="4" y2="11.5"/>
+          <path d="M4 6a4 4 0 004 4h3"/>
+          <path d="M10 7.5l1.5-1.5L10 4.5"/>
+        </svg>
+        Git Compare
+      </Link>
+
       <button
         onClick={onOpenGuide}
         title="User Guide"

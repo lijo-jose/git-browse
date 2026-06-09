@@ -1,14 +1,31 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { execSync } from 'child_process';
 
 export interface FsEntry {
   name: string;
   path: string;
   isDirectory: boolean;
   isGitRepo: boolean;
+  isIgnored?: boolean;
   size?: number;
   modified?: string;
+}
+
+function getIgnoredNames(dirPath: string, names: string[]): Set<string> {
+  try {
+    const input = names.join('\0');
+    const out = execSync('git check-ignore -z --stdin', {
+      cwd: dirPath,
+      input,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    return new Set(out.split('\0').map(p => path.basename(p)).filter(Boolean));
+  } catch {
+    return new Set();
+  }
 }
 
 export function resolvePath(p: string): string {
@@ -21,9 +38,13 @@ export function listDirectory(dirPath: string): FsEntry[] {
   const resolved = resolvePath(dirPath);
   const entries = fs.readdirSync(resolved, { withFileTypes: true });
 
-  return entries
+  const visible = entries
     .filter((e) => !e.name.startsWith('.') || e.name === '.git')
-    .filter((e) => e.name !== '.git') // don't show .git as a navigable entry
+    .filter((e) => e.name !== '.git');
+
+  const ignoredNames = getIgnoredNames(resolved, visible.map(e => e.name));
+
+  return visible
     .map((e) => {
       const fullPath = path.join(resolved, e.name);
       const isDir = e.isDirectory();
@@ -46,6 +67,7 @@ export function listDirectory(dirPath: string): FsEntry[] {
         path: fullPath,
         isDirectory: isDir,
         isGitRepo,
+        isIgnored: ignoredNames.has(e.name),
         size: stat?.size,
         modified: stat?.mtime.toISOString(),
       };

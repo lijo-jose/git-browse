@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { applyStash, dropStash } from '@/lib/git';
+import { applyStash, dropStash, popStash } from '@/lib/git';
 import { assertGitRepo } from '@/lib/validate';
 
 export async function POST(req: NextRequest) {
@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const repo = assertGitRepo(raw);
     if (action === 'drop') await dropStash(repo, index);
+    else if (action === 'pop') await popStash(repo, index);
     else await applyStash(repo, index);
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

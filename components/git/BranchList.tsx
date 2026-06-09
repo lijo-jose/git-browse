@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 interface Branch { name: string; current: boolean; remote: boolean; lastCommit?: string; lastCommitDate?: string; }
 type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string };
 
-export default function BranchList({ repo, onBranchSwitch }: { repo: string; onBranchSwitch?: () => void }) {
+export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: string; onBranchSwitch?: () => void; onCompare?: (branch: string) => void }) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +18,9 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
   const [newBranchOpen, setNewBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [rebaseOpen, setRebaseOpen] = useState(false);
+  const [rebaseBranch, setRebaseBranch] = useState('');
+  const [rebasing, setRebasing] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ branch: Branch; x: number; y: number } | null>(null);
 
   const load = () => {
@@ -104,6 +107,25 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
     finally { setCreating(false); }
   };
 
+  const doRebase = async () => {
+    if (!rebaseBranch.trim()) return;
+    setRebasing(true);
+    try {
+      const res = await fetch('/api/git/rebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, branch: rebaseBranch.trim() }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      toast.success(d.result || `Rebased onto ${rebaseBranch.trim()}`);
+      setRebaseOpen(false);
+      setRebaseBranch('');
+      onBranchSwitch?.();
+    } catch (e) { toast.error('Rebase failed', { description: String(e) }); }
+    finally { setRebasing(false); }
+  };
+
   if (loading) return (
     <div className="p-3 space-y-1">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -137,6 +159,19 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
         {b.current && (
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-wide bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/25">HEAD</span>
         )}
+        {onCompare && !b.current && (
+          <button
+            onClick={e => { e.stopPropagation(); onCompare(b.name); }}
+            title={`Compare HEAD ↔ ${b.name}`}
+            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+            style={{ background: 'color-mix(in oklch, var(--primary) 15%, transparent)', color: 'var(--primary)' }}
+          >
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 6h8M4 10h8M8 2v12"/>
+            </svg>
+            diff
+          </button>
+        )}
       </div>
       {(b.lastCommit || b.lastCommitDate) && (
         <div className="flex items-center gap-2 mt-0.5 pl-3.5">
@@ -161,17 +196,27 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
         {remote.length > 0 && <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>}
       </div>
 
-      {/* New branch button */}
-      <div className="flex-shrink-0 px-3 py-2" style={{ borderTop: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+      {/* New branch / Rebase buttons */}
+      <div className="flex-shrink-0 px-3 py-2 flex gap-1.5" style={{ borderTop: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
         <button
           onClick={() => setNewBranchOpen(true)}
-          className="w-full h-7 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+          className="flex-1 h-7 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
           style={{ background: 'var(--bg-raised)', color: 'var(--foreground)' }}
         >
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
             <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
           </svg>
           New branch
+        </button>
+        <button
+          onClick={() => setRebaseOpen(true)}
+          className="flex-1 h-7 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+          style={{ background: 'var(--bg-raised)', color: 'var(--foreground)' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <polyline points="2,9 6,3 10,9"/><line x1="6" y1="3" x2="6" y2="11"/>
+          </svg>
+          Rebase onto…
         </button>
       </div>
 
@@ -232,6 +277,35 @@ export default function BranchList({ repo, onBranchSwitch }: { repo: string; onB
               className={`text-xs ${action?.type === 'delete' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-blue-600 hover:bg-blue-500'} text-white`}
             >
               {busy ? '…' : action ? actionLabels[action.type] : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rebase dialog */}
+      <Dialog open={rebaseOpen} onOpenChange={open => { setRebaseOpen(open); if (!open) setRebaseBranch(''); }}>
+        <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">Rebase onto Branch</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            <label className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--text-dim)' }}>Target branch</label>
+            <input
+              autoFocus
+              type="text"
+              value={rebaseBranch}
+              onChange={e => setRebaseBranch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') doRebase(); }}
+              placeholder="main"
+              className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60"
+              style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}
+            />
+            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Rebase <span className="font-mono">{currentBranch}</span> onto the typed branch</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRebaseOpen(false)} className="text-xs">Cancel</Button>
+            <Button onClick={doRebase} disabled={!rebaseBranch.trim() || rebasing} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">
+              {rebasing ? 'Rebasing…' : 'Rebase'}
             </Button>
           </DialogFooter>
         </DialogContent>

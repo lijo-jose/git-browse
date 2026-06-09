@@ -133,6 +133,44 @@ export async function getDiff(
   return git.diff();
 }
 
+// ── Branch/commit compare ─────────────────────────────────────────────────────
+
+export interface CompareFile { path: string; status: string; insertions: number; deletions: number; }
+
+export async function getCompareRefs(repoPath: string): Promise<{ branches: string[]; tags: string[]; recent: { hash: string; short: string; subject: string }[] }> {
+  const git = getGit(repoPath);
+  const [rawBranches, tagResult, rawLog] = await Promise.all([
+    git.raw(['branch', '-a', '--sort=-committerdate', '--format=%(refname:short)']),
+    git.tags(['--sort=-creatordate']),
+    git.raw(['log', '--pretty=format:%H%x00%h%x00%s', '-20']),
+  ]);
+  const branches = rawBranches.trim().split('\n').filter(Boolean);
+  const tags = tagResult.all.filter(Boolean);
+  const recent = rawLog.trim().split('\n').filter(Boolean).map(line => {
+    const [hash, short, ...rest] = line.split('\x00');
+    return { hash, short, subject: rest.join('\x00') };
+  });
+  return { branches, tags, recent };
+}
+
+export async function getCompareFiles(repoPath: string, base: string, target = 'HEAD'): Promise<CompareFile[]> {
+  const git = getGit(repoPath);
+  const raw = await git.raw(['diff', '--numstat', `${base}...${target}`]);
+  return raw.trim().split('\n').filter(Boolean).map(line => {
+    const [ins, del, ...pathParts] = line.split('\t');
+    const fullPath = pathParts.join('\t');
+    // handle renames: "{old => new}" or "old/path => new/path"
+    const path = fullPath.replace(/\{([^}]*) => ([^}]*)\}/, '$2').replace(/ => /, '/');
+    return { path, status: 'M', insertions: parseInt(ins) || 0, deletions: parseInt(del) || 0 };
+  });
+}
+
+export async function getCompareDiff(repoPath: string, base: string, file?: string, target = 'HEAD'): Promise<string> {
+  const git = getGit(repoPath);
+  if (file) return git.raw(['diff', `${base}...${target}`, '--', file]);
+  return git.raw(['diff', `${base}...${target}`]);
+}
+
 // ── Branches ─────────────────────────────────────────────────────────────────
 
 export interface BranchInfo {
@@ -184,6 +222,10 @@ export async function applyStash(repoPath: string, index: number): Promise<void>
 
 export async function dropStash(repoPath: string, index: number): Promise<void> {
   await getGit(repoPath).stash(['drop', `stash@{${index}}`]);
+}
+
+export async function popStash(repoPath: string, index: number): Promise<void> {
+  await getGit(repoPath).stash(['pop', `stash@{${index}}`]);
 }
 
 // ── Remote ops ───────────────────────────────────────────────────────────────
