@@ -15,6 +15,14 @@ interface TopBarProps {
 
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const [branch, setBranch] = useState('');
+  const [searchAvailable, setSearchAvailable] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/system')
+      .then(r => r.json())
+      .then(d => setSearchAvailable(d.platform !== 'win32'))
+      .catch(() => {});
+  }, []);
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -262,6 +270,18 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       </div>
 
       <ThemeToggle />
+
+      {searchAvailable && <Link
+        href="/search"
+        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+        title="Search file contents / names"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </Link>}
 
       <Link
         href="/compare"

@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import InteractiveRebaseDialog from './InteractiveRebaseDialog';
 
 interface Branch { name: string; current: boolean; remote: boolean; lastCommit?: string; lastCommitDate?: string; }
 type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string };
@@ -21,6 +22,8 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   const [rebaseOpen, setRebaseOpen] = useState(false);
   const [rebaseBranch, setRebaseBranch] = useState('');
   const [rebasing, setRebasing] = useState(false);
+  const [interactiveOpen, setInteractiveOpen] = useState(false);
+  const [interactiveBase, setInteractiveBase] = useState<string | undefined>(undefined);
   const [contextMenu, setContextMenu] = useState<{ branch: Branch; x: number; y: number } | null>(null);
 
   const load = () => {
@@ -218,6 +221,17 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
           </svg>
           Rebase onto…
         </button>
+        <button
+          onClick={() => { setInteractiveBase(undefined); setInteractiveOpen(true); }}
+          title="Interactive rebase (reorder, squash, reword, drop commits)"
+          className="flex-1 h-7 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+          style={{ background: 'var(--bg-raised)', color: 'var(--foreground)' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="2" y1="3" x2="10" y2="3"/><line x1="2" y1="6" x2="10" y2="6"/><line x1="2" y1="9" x2="10" y2="9"/>
+          </svg>
+          Interactive…
+        </button>
       </div>
 
       {/* Context menu */}
@@ -245,6 +259,11 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
           {!contextMenu.branch.current && !contextMenu.branch.remote && (
             <MenuItem onClick={() => { setAction({ type: 'rebase', branch: contextMenu.branch.name }); setContextMenu(null); }}>
               Rebase onto {contextMenu.branch.name}
+            </MenuItem>
+          )}
+          {!contextMenu.branch.current && (
+            <MenuItem onClick={() => { setInteractiveBase(contextMenu.branch.name); setInteractiveOpen(true); setContextMenu(null); }}>
+              Interactive rebase onto {contextMenu.branch.name}
             </MenuItem>
           )}
           {!contextMenu.branch.current && !contextMenu.branch.remote && (
@@ -310,6 +329,17 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Interactive rebase dialog */}
+      <InteractiveRebaseDialog
+        repo={repo}
+        open={interactiveOpen}
+        onOpenChange={setInteractiveOpen}
+        branches={branches.map(b => b.name)}
+        currentBranch={currentBranch}
+        initialBase={interactiveBase}
+        onDone={() => { onBranchSwitch?.(); load(); }}
+      />
 
       {/* New branch dialog */}
       <Dialog open={newBranchOpen} onOpenChange={setNewBranchOpen}>

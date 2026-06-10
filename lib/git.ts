@@ -1,5 +1,8 @@
 import simpleGit, { SimpleGit, LogResult } from 'simple-git';
 import { execSync } from 'child_process';
+import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join, isAbsolute } from 'path';
 
 export function getGit(repoPath: string): SimpleGit {
   return simpleGit(repoPath);
@@ -313,6 +316,151 @@ export async function mergeBranch(repoPath: string, branch: string): Promise<str
 export async function rebaseBranch(repoPath: string, branch: string): Promise<string> {
   await getGit(repoPath).rebase([branch]);
   return `Rebased onto ${branch}`;
+}
+
+// ── Interactive rebase ────────────────────────────────────────────────────────
+
+export interface RebaseCommit {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
+}
+
+/** Commits that an interactive rebase onto `base` would replay (oldest first). */
+export function getRebaseCommits(repoPath: string, base: string): RebaseCommit[] {
+  const raw = execSync(
+    `git log --reverse --pretty=format:"%H%x00%h%x00%s%x00%an%x00%ar" ${JSON.stringify(base)}..HEAD`,
+    { cwd: repoPath, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+  );
+  return raw.split('\n').filter(Boolean).map(line => {
+    const [hash, shortHash, subject, author, date] = line.split('\x00');
+    return { hash, shortHash, subject, author, date };
+  });
+}
+
+export type RebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop';
+
+export interface RebaseTodoEntry {
+  hash: string;
+  action: RebaseAction;
+  /** New commit message — used by reword, and optionally by squash to override the combined message. */
+  message?: string;
+}
+
+export interface RebaseState {
+  inProgress: boolean;
+  conflicts: string[];
+  /** Short hash of the commit being replayed when stopped, if known. */
+  stoppedAt?: string;
+}
+
+export function getRebaseState(repoPath: string): RebaseState {
+  const gitDir = execSync('git rev-parse --git-dir', { cwd: repoPath, encoding: 'utf8' }).trim();
+  const abs = isAbsolute(gitDir) ? gitDir : join(repoPath, gitDir);
+  const inProgress = existsSync(join(abs, 'rebase-merge')) || existsSync(join(abs, 'rebase-apply'));
+  if (!inProgress) return { inProgress: false, conflicts: [] };
+  const conflicts = execSync('git diff --name-only --diff-filter=U', { cwd: repoPath, encoding: 'utf8' })
+    .split('\n').filter(Boolean);
+  let stoppedAt: string | undefined;
+  const stoppedFile = join(abs, 'rebase-merge', 'stopped-sha');
+  if (existsSync(stoppedFile)) {
+    stoppedAt = execSync('git rev-parse --short REBASE_HEAD', { cwd: repoPath, encoding: 'utf8' }).trim();
+  }
+  return { inProgress: true, conflicts, stoppedAt };
+}
+
+/**
+ * Run a non-terminal `git rebase -i` by injecting a generated todo list via
+ * GIT_SEQUENCE_EDITOR. Reword/squash messages are applied with
+ * `exec git commit --amend -F <file>` lines so no interactive editor is needed.
+ */
+export function interactiveRebase(repoPath: string, base: string, todo: RebaseTodoEntry[]): string {
+  if (!todo.length) throw new Error('No commits to rebase');
+  const first = todo.find(t => t.action !== 'drop');
+  if (first && (first.action === 'squash' || first.action === 'fixup')) {
+    throw new Error('The first kept commit cannot be squash/fixup — it has no previous commit to fold into');
+  }
+
+  const dir = mkdtempSync(join(tmpdir(), 'git-tree-rebase-'));
+  try {
+    const lines: string[] = [];
+    todo.forEach((t, i) => {
+      const hash = t.hash.trim();
+      if (!/^[0-9a-f]{4,40}$/i.test(hash)) throw new Error(`Invalid commit hash: ${hash}`);
+      switch (t.action) {
+        case 'drop':
+          lines.push(`drop ${hash}`);
+          break;
+        case 'fixup':
+          lines.push(`fixup ${hash}`);
+          break;
+        case 'squash':
+          // GIT_EDITOR=true keeps git's auto-combined message; an explicit
+          // message is applied afterwards via exec amend.
+          lines.push(`squash ${hash}`);
+          if (t.message?.trim()) lines.push(`exec git commit --amend -F ${msgFile(dir, i, t.message)}`);
+          break;
+        case 'reword':
+          if (!t.message?.trim()) throw new Error(`Reword for ${hash} requires a message`);
+          lines.push(`pick ${hash}`);
+          lines.push(`exec git commit --amend -F ${msgFile(dir, i, t.message)}`);
+          break;
+        default:
+          lines.push(`pick ${hash}`);
+      }
+    });
+
+    const todoFile = join(dir, 'todo.txt');
+    writeFileSync(todoFile, lines.join('\n') + '\n');
+    // Tiny editor that replaces git's generated todo with ours (portable, no shell quoting issues).
+    const seqEditor = join(dir, 'seq-editor.js');
+    writeFileSync(seqEditor, `require('fs').copyFileSync(process.env.GT_TODO_FILE, process.argv[2]);`);
+
+    execSync(`git rebase -i ${JSON.stringify(base)}`, {
+      cwd: repoPath,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GT_TODO_FILE: todoFile,
+        GIT_SEQUENCE_EDITOR: `"${process.execPath.replace(/\\/g, '/')}" "${seqEditor.replace(/\\/g, '/')}"`,
+        GIT_EDITOR: 'true',
+      },
+    });
+    return `Interactively rebased onto ${base}`;
+  } finally {
+    // The rebase may still reference message files if it stopped on a conflict
+    // before reaching an exec line; only clean up when no rebase is in progress.
+    try { if (!getRebaseState(repoPath).inProgress) rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+  }
+}
+
+function msgFile(dir: string, i: number, message: string): string {
+  const file = join(dir, `msg-${i}.txt`);
+  writeFileSync(file, message.trim() + '\n');
+  // exec lines run through git's sh even on Windows — forward slashes + quotes are safe.
+  return `"${file.replace(/\\/g, '/')}"`;
+}
+
+export function continueRebase(repoPath: string): RebaseState {
+  execSync('git rebase --continue', {
+    cwd: repoPath, encoding: 'utf8',
+    env: { ...process.env, GIT_EDITOR: 'true' },
+  });
+  return getRebaseState(repoPath);
+}
+
+export function abortRebase(repoPath: string): void {
+  execSync('git rebase --abort', { cwd: repoPath, encoding: 'utf8' });
+}
+
+export function skipRebase(repoPath: string): RebaseState {
+  execSync('git rebase --skip', {
+    cwd: repoPath, encoding: 'utf8',
+    env: { ...process.env, GIT_EDITOR: 'true' },
+  });
+  return getRebaseState(repoPath);
 }
 
 // ── Remotes / repo info ───────────────────────────────────────────────────────
