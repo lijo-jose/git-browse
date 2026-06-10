@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import DirPicker from './ui/DirPicker';
+import { COMMAND_EVENT } from './CommandPalette';
 
 interface TopBarProps {
   repo: string | null;
@@ -113,6 +114,19 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       setBranchPickPath(null);
     }
   };
+
+  // Commands from the global palette (⌘K)
+  useEffect(() => {
+    const fn = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id === 'sync:pull') run('pull');
+      else if (id === 'sync:fetch') run('fetch');
+      else if (id === 'sync:push') run('push');
+      else if (id === 'clone') openClone();
+    };
+    window.addEventListener(COMMAND_EVENT, fn);
+    return () => window.removeEventListener(COMMAND_EVENT, fn);
+  }); // re-bound each render so run/openClone see fresh state
 
   const run = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;

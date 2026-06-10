@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
+import CommandPalette from './CommandPalette';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
@@ -124,6 +125,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {children}
       </div>
+
+      <CommandPalette />
     </div>
   );
 }
