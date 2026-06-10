@@ -53,7 +53,7 @@ export default function Home() {
   }, [handleKeyDown]);
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
       <TopBar repo={repo} onRepoSelect={handleRepoSelect} onCloned={setClonedRepo} onOpenGuide={openGuide} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">

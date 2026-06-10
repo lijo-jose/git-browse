@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useTheme, THEMES, FONT_SIZES, type FontSize } from '@/lib/theme';
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ placement = 'topbar' }: { placement?: 'topbar' | 'rail' }) {
   const { theme, setTheme, fontSize, setFontSize } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -21,17 +21,21 @@ export default function ThemeToggle() {
       <button
         onClick={() => setOpen(v => !v)}
         title="Theme & font size"
-        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+        className={placement === 'rail'
+          ? 'w-9 h-9 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors'
+          : 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors'}
       >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={placement === 'rail' ? 16 : 13} height={placement === 'rail' ? 16 : 13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="8" cy="8" r="3"/>
           <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/>
         </svg>
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
+        {placement !== 'rail' && <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-9 z-50 w-52 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden">
+        <div className={`absolute z-50 w-52 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden ${
+          placement === 'rail' ? 'left-11 bottom-0' : 'right-0 top-9'
+        }`}>
           {/* Theme section */}
           <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Theme</div>
           <div className="px-2 pb-2 flex flex-col gap-0.5">

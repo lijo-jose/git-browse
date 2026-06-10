@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import Link from 'next/link';
-import ThemeToggle from './ThemeToggle';
 import DirPicker from './ui/DirPicker';
 
 interface TopBarProps {
@@ -15,14 +13,6 @@ interface TopBarProps {
 
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const [branch, setBranch] = useState('');
-  const [searchAvailable, setSearchAvailable] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/system')
-      .then(r => r.json())
-      .then(d => setSearchAvailable(d.platform !== 'win32'))
-      .catch(() => {});
-  }, []);
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -214,14 +204,6 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   return (
     <>
     <header className="h-11 flex items-center gap-3 px-4 bg-[var(--bg-panel)] border-b border-[var(--border-subtle)]/60 flex-shrink-0 select-none">
-      {/* Brand */}
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center text-white text-xs font-bold">G</div>
-        <span className="text-sm font-semibold text-foreground">GitBrowse</span>
-      </div>
-
-      <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
-
       {/* Repo + branch */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {repo ? (
@@ -268,47 +250,6 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           </div>
         )}
       </div>
-
-      <ThemeToggle />
-
-      {searchAvailable && <Link
-        href="/search"
-        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-        title="Search file contents / names"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="7"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        Search
-      </Link>}
-
-      <Link
-        href="/compare"
-        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-        title="Compare files/folders"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M8 6H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3"/>
-          <rect x="11" y="3" width="10" height="10" rx="2"/>
-        </svg>
-        Compare
-      </Link>
-
-      <Link
-        href={repo ? `/git-compare?repo=${encodeURIComponent(repo)}` : '/git-compare'}
-        className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
-        title="Compare branches / commits"
-      >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="4" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/>
-          <circle cx="12" cy="3" r="1.5"/>
-          <line x1="4" y1="4.5" x2="4" y2="11.5"/>
-          <path d="M4 6a4 4 0 004 4h3"/>
-          <path d="M10 7.5l1.5-1.5L10 4.5"/>
-        </svg>
-        Git Compare
-      </Link>
 
       <button
         onClick={onOpenGuide}

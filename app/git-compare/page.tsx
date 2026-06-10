@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { Toaster } from '@/components/ui/sonner';
-import ThemeToggle from '@/components/ThemeToggle';
 import { parseDiff } from '@/components/compare/diffUtils';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -14,23 +12,13 @@ interface FsEntry { name: string; path: string; isDirectory: boolean; isGitRepo:
 /* ── Page ───────────────────────────────────────────────────────────────── */
 export default function GitComparePage() {
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <header className="flex items-center gap-3 px-5 h-12 shrink-0" style={{
         background: 'var(--bg-panel)',
         borderBottom: '1px solid var(--border-subtle)',
       }}>
-        <Link href="/" className="flex items-center gap-1.5 text-xs font-medium transition-colors"
-          style={{ color: 'var(--text-dim)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          GitBrowse
-        </Link>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--border-subtle)' }}><path d="M9 18l6-6-6-6"/></svg>
         <span className="text-sm font-semibold">Git Compare</span>
         <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>branch · tag · commit</span>
-        <div className="ml-auto"><ThemeToggle /></div>
       </header>
 
       <GitCompareMain />
@@ -45,11 +33,15 @@ function GitCompareMain() {
   const [repo, setRepo] = useState('');
   const [refs, setRefs] = useState<Refs | null>(null);
 
-  // Pre-fill repo from ?repo= query param
+  // Pre-fill repo from ?repo= query param, falling back to the last-used repo
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const r = p.get('repo');
-    if (r) setRepo(r);
+    if (r) { setRepo(r); return; }
+    try {
+      const last = localStorage.getItem('git-browser-last-repo');
+      if (last) setRepo(last);
+    } catch {}
   }, []);
   const [refsLoading, setRefsLoading] = useState(false);
   const [base, setBase] = useState('');

@@ -1,8 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
 
 type Mode = 'grep' | 'find';
 
@@ -63,23 +61,12 @@ export default function SearchPage() {
   const count = mode === 'grep' ? matches.length : paths.length;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       {/* ── Top bar ── */}
       <header className="flex items-center gap-3 px-5 h-12 shrink-0" style={{
         background: 'var(--bg-panel)',
         borderBottom: '1px solid var(--border-subtle)',
       }}>
-        <Link href="/" className="group flex items-center gap-1.5 text-xs font-medium transition-colors"
-          style={{ color: 'var(--text-dim)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          GitBrowse
-        </Link>
-
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--border-subtle)' }}><path d="M9 18l6-6-6-6"/></svg>
-
         <span className="text-sm font-semibold">Search</span>
 
         <div className="flex items-center gap-0.5 ml-3 px-1 py-1 rounded-xl" style={{ background: 'var(--bg-raised)' }}>
@@ -104,7 +91,6 @@ export default function SearchPage() {
           ))}
         </div>
 
-        <div className="ml-auto"><ThemeToggle /></div>
       </header>
 
       {unsupported ? (
