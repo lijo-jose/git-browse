@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import DirPicker from './ui/DirPicker';
 import { COMMAND_EVENT } from './CommandPalette';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
 
 interface TopBarProps {
   repo: string | null;
@@ -30,6 +32,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [branchBusy, setBranchBusy] = useState(false);
   const [cloneProgress, setCloneProgress] = useState<string | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [upstreamPrompt, setUpstreamPrompt] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
 
@@ -143,19 +146,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           const noUpstream = /no upstream|set.upstream|has no upstream/i.test(data.error);
           if (noUpstream && branch) {
             setBusy(null);
-            const confirmed = window.confirm(
-              `Branch "${branch}" has no upstream.\n\nRun: git push --set-upstream origin ${branch}?`
-            );
-            if (!confirmed) return;
-            setBusy('push');
-            const res2 = await fetch('/api/git/push', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ repo, setUpstream: true, branch }),
-            });
-            const data2 = await res2.json();
-            if (data2.error) throw new Error(data2.error);
-            toast.success('Pushed', { description: data2.result || 'Done' });
+            setUpstreamPrompt(true);
             return;
           }
           throw new Error(data.error);
@@ -169,6 +160,24 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       }
     } catch (e) {
       toast.error(`${action} failed`, { description: String(e) });
+    } finally { setBusy(null); }
+  };
+
+  const pushWithUpstream = async () => {
+    setUpstreamPrompt(false);
+    if (!repo) return;
+    setBusy('push');
+    try {
+      const res = await fetch('/api/git/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, setUpstream: true, branch }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Pushed', { description: data.result || 'Done' });
+    } catch (e) {
+      toast.error('push failed', { description: String(e) });
     } finally { setBusy(null); }
   };
 
@@ -414,6 +423,25 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         </div>
       </div>
     </header>
+
+    {/* No-upstream push confirm */}
+    <Dialog open={upstreamPrompt} onOpenChange={setUpstreamPrompt}>
+      <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Set Upstream Branch</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm" style={{ color: 'var(--text-soft)' }}>
+          Branch <span className="font-mono text-blue-500">{branch}</span> has no upstream.
+        </p>
+        <p className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>
+          git push --set-upstream origin {branch}
+        </p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setUpstreamPrompt(false)} className="text-xs">Cancel</Button>
+          <Button onClick={pushWithUpstream} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">Push & set upstream</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     {cloneProgress && (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">

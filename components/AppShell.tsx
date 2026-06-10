@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import CommandPalette from './CommandPalette';
+import { Toaster } from './ui/sonner';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
@@ -127,6 +128,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <CommandPalette />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

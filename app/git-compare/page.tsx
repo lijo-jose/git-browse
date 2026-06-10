@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Toaster } from '@/components/ui/sonner';
 import { parseDiff } from '@/components/compare/diffUtils';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -23,7 +22,6 @@ export default function GitComparePage() {
 
       <GitCompareMain />
 
-      <Toaster position="bottom-right" />
     </div>
   );
 }

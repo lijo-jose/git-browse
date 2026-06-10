@@ -77,16 +77,11 @@ export default function SearchPage() {
             <button
               key={id}
               onClick={() => { setMode(id); setSearched(false); setError(''); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
-              style={mode === id ? {
-                background: 'var(--primary)',
-                color: 'white',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-              } : {
-                color: 'var(--text-dim)',
-              }}
-              onMouseEnter={e => { if (mode !== id) (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'; }}
-              onMouseLeave={e => { if (mode !== id) (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                mode === id
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-[var(--text-dim)] hover:text-[var(--foreground)]'
+              }`}
             >{label}</button>
           ))}
         </div>

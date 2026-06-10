@@ -222,6 +222,15 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
                 style={{ color: selectedRepo === e.path ? 'var(--primary)' : e.isDirectory ? 'var(--foreground)' : 'var(--text-dim)' }}>
                 {e.name}
               </span>
+              {e.isDirectory && (
+                <button
+                  onClick={ev => { ev.stopPropagation(); if (isPinned(e.path)) unpin(e.path); else pin(e); }}
+                  title={isPinned(e.path) ? 'Unpin' : 'Pin to top'}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-[var(--primary)]"
+                >
+                  {isPinned(e.path) ? <PinOffIcon /> : <PinIcon />}
+                </button>
+              )}
               {e.isGitRepo && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/20 tracking-wide flex-shrink-0">
                   GIT

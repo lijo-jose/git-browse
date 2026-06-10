@@ -6,7 +6,6 @@ import GitPanel from '@/components/panels/GitPanel';
 import DiffPanel from '@/components/panels/DiffPanel';
 import InlineCompare from '@/components/git/InlineCompare';
 import TopBar from '@/components/TopBar';
-import { Toaster } from '@/components/ui/sonner';
 import UserGuideModal, { useUserGuide } from '@/components/UserGuideModal';
 import { COMMAND_EVENT } from '@/components/CommandPalette';
 
@@ -189,7 +188,6 @@ export default function Home() {
       </footer>
 
       <UserGuideModal open={guideOpen} onClose={closeGuide} />
-      <Toaster position="bottom-right" />
     </div>
   );
 }

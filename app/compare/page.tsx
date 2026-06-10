@@ -8,7 +8,6 @@ import FileTree from '@/components/compare/FileTree';
 import IgnorePatterns, { DEFAULT_PATTERNS } from '@/components/compare/IgnorePatterns';
 import { pushHistory, type HistoryEntry } from '@/lib/compareHistory';
 import { useDrop } from '@/lib/useDrop';
-import { Toaster } from '@/components/ui/sonner';
 
 type Mode = 'folders' | 'files' | 'clipboard';
 
@@ -42,16 +41,11 @@ export default function ComparePage() {
             <button
               key={id}
               onClick={() => setMode(id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
-              style={mode === id ? {
-                background: 'var(--primary)',
-                color: 'white',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-              } : {
-                color: 'var(--text-dim)',
-              }}
-              onMouseEnter={e => { if (mode !== id) (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'; }}
-              onMouseLeave={e => { if (mode !== id) (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                mode === id
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-[var(--text-dim)] hover:text-[var(--foreground)]'
+              }`}
             >
               {icon}{label}
             </button>
@@ -64,7 +58,6 @@ export default function ComparePage() {
       {mode === 'files'     && <FilesMode />}
       {mode === 'clipboard' && <div className="flex flex-1 min-h-0 overflow-hidden"><ClipboardDiffViewer /></div>}
 
-      <Toaster position="bottom-right" />
     </div>
   );
 }
