@@ -79,7 +79,7 @@ export default function ComparePage() {
       {mode === 'files'     && <FilesMode />}
       {mode === 'clipboard' && <div className="flex flex-1 min-h-0 overflow-hidden"><ClipboardDiffViewer /></div>}
 
-      <Toaster theme="dark" position="bottom-right" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

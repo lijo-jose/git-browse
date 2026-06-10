@@ -177,7 +177,7 @@ export default function Home() {
       </footer>
 
       <UserGuideModal open={guideOpen} onClose={closeGuide} />
-      <Toaster theme="dark" position="bottom-right" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

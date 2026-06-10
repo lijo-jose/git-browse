@@ -35,7 +35,7 @@ export default function GitComparePage() {
 
       <GitCompareMain />
 
-      <Toaster theme="dark" position="bottom-right" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }
