@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 56" width="240" height="56">
+  <rect width="56" height="56" rx="14" fill="#1e293b"/>
+  <path d="M18 42 V22 Q18 16 24 16 H30" stroke="#f97316" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="18" cy="42" r="4.5" fill="#e2e8f0"/>
+  <circle cx="33" cy="30" r="8" fill="none" stroke="#e2e8f0" stroke-width="3.5"/>
+  <circle cx="33" cy="30" r="2.5" fill="#38bdf8"/>
+  <line x1="39" y1="36" x2="45" y2="42" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  <text x="70" y="37" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="26" fill="#e2e8f0">git <tspan fill="#f97316">browse</tspan></text>
+</svg>

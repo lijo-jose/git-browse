@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Git Browser",
+  title: "Git Browse",
   description: "Local git repository browser inspired by tig",
 };
 

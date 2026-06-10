@@ -25,6 +25,10 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   const [interactiveOpen, setInteractiveOpen] = useState(false);
   const [interactiveBase, setInteractiveBase] = useState<string | undefined>(undefined);
   const [contextMenu, setContextMenu] = useState<{ branch: Branch; x: number; y: number } | null>(null);
+  const [tags, setTags] = useState<{ name: string; date: string; subject: string }[]>([]);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [tagName, setTagName] = useState('');
+  const [tagging, setTagging] = useState(false);
 
   const load = () => {
     if (!repo) return;
@@ -34,6 +38,30 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       .then(d => { if (d.error) setError(d.error); else setBranches(d.branches || []); })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
+    fetch(`/api/git/tag?repo=${encodeURIComponent(repo)}`)
+      .then(r => r.json())
+      .then(d => setTags(d.tags || []))
+      .catch(() => {});
+  };
+
+  const doTag = async () => {
+    const t = tagName.trim();
+    if (!t) return;
+    setTagging(true);
+    try {
+      const res = await fetch('/api/git/tag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, tag: t }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      toast.success('Tag created & pushed', { description: d.result || t });
+      setTagDialogOpen(false);
+      setTagName('');
+      load();
+    } catch (e) { toast.error('Tag failed', { description: String(e) }); }
+    finally { setTagging(false); }
   };
 
   useEffect(() => { load(); }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -197,6 +225,35 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
         {local.length > 0 && <><Label>Local</Label>{local.map(Row)}</>}
         {remote.length > 0 && <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>}
+
+        {/* Tags */}
+        <div className="flex items-center justify-between pr-3 mt-2">
+          <Label>Tags</Label>
+          <button
+            onClick={() => setTagDialogOpen(true)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors"
+            style={{ background: 'color-mix(in oklch, var(--primary) 12%, transparent)', color: 'var(--primary)' }}
+          >
+            <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
+            </svg>
+            new
+          </button>
+        </div>
+        {tags.length === 0 ? (
+          <p className="mx-4 mb-1 text-[10px]" style={{ color: 'var(--text-dim)' }}>No tags</p>
+        ) : tags.map(t => (
+          <div key={t.name} className="mx-2 px-3 py-1.5 rounded-lg mb-0.5">
+            <div className="flex items-center gap-2">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" className="flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                <path d="M2 2h5.6a2 2 0 011.4.6l5 5a2 2 0 010 2.8l-3.6 3.6a2 2 0 01-2.8 0l-5-5A2 2 0 012 7.6V2z"/><circle cx="5.5" cy="5.5" r="1"/>
+              </svg>
+              <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--foreground)' }}>{t.name}</span>
+              {t.date && <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-dim)', opacity: 0.7 }}>{t.date}</span>}
+            </div>
+            {t.subject && <p className="text-[10px] truncate mt-0.5 pl-4" style={{ color: 'var(--text-dim)' }}>{t.subject}</p>}
+          </div>
+        ))}
       </div>
 
       {/* New branch / Rebase buttons */}
@@ -340,6 +397,35 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         initialBase={interactiveBase}
         onDone={() => { onBranchSwitch?.(); load(); }}
       />
+
+      {/* New tag dialog */}
+      <Dialog open={tagDialogOpen} onOpenChange={open => { setTagDialogOpen(open); if (!open) setTagName(''); }}>
+        <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">New Tag</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            <label className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--text-dim)' }}>Tag name</label>
+            <input
+              autoFocus
+              type="text"
+              value={tagName}
+              onChange={e => setTagName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') doTag(); }}
+              placeholder="v1.0.0"
+              className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60"
+              style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}
+            />
+            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Tags <span className="font-mono">{currentBranch}</span> at HEAD and pushes the tag to origin</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTagDialogOpen(false)} className="text-xs">Cancel</Button>
+            <Button onClick={doTag} disabled={!tagName.trim() || tagging} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">
+              {tagging ? 'Tagging…' : 'Create & push'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New branch dialog */}
       <Dialog open={newBranchOpen} onOpenChange={setNewBranchOpen}>

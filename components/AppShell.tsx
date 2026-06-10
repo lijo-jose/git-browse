@@ -84,8 +84,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Activity rail */}
       <nav className="w-12 flex-shrink-0 flex flex-col items-center py-2 gap-1 bg-[var(--bg-panel)] border-r border-[var(--border-subtle)]/60 select-none">
-        <Link href="/" title="GitBrowse" className="w-7 h-7 mb-2 rounded-md bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-          G
+        <Link href="/" title="Git Browse" className="w-7 h-7 mb-2 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 56 56" aria-label="Git Browse">
+            <rect width="56" height="56" rx="14" fill="#1e293b"/>
+            <path d="M18 42 V22 Q18 16 24 16 H30" stroke="#f97316" strokeWidth="4" fill="none" strokeLinecap="round"/>
+            <circle cx="18" cy="42" r="4.5" fill="#e2e8f0"/>
+            <circle cx="33" cy="30" r="8" fill="none" stroke="#e2e8f0" strokeWidth="3.5"/>
+            <circle cx="33" cy="30" r="2.5" fill="#38bdf8"/>
+            <line x1="39" y1="36" x2="45" y2="42" stroke="#e2e8f0" strokeWidth="4" strokeLinecap="round"/>
+          </svg>
         </Link>
 
         {items.map(item => {

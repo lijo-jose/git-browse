@@ -28,13 +28,9 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [branchFilter, setBranchFilter] = useState('');
   const [branchBusy, setBranchBusy] = useState(false);
   const [cloneProgress, setCloneProgress] = useState<string | null>(null);
-  const [tagMode, setTagMode] = useState(false);
-  const [tagName, setTagName] = useState('');
-  const [tagOpen, setTagOpen] = useState(false);
-  const [tags, setTags] = useState<{ name: string; date: string; subject: string }[]>([]);
+  const [syncOpen, setSyncOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const tagRef = useRef<HTMLDivElement>(null);
-  const tagInputRef = useRef<HTMLInputElement>(null);
+  const syncRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!repo) { setBranch(''); setRepoName(''); return; }
@@ -57,53 +53,14 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     try { setRecent(JSON.parse(localStorage.getItem('git-browser-recent') || '[]')); } catch {}
     const fn = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-      if (tagRef.current && !tagRef.current.contains(e.target as Node)) setTagOpen(false);
+      if (syncRef.current && !syncRef.current.contains(e.target as Node)) setSyncOpen(false);
     };
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  const loadTags = () => {
-    if (!repo) return;
-    fetch(`/api/git/tag?repo=${encodeURIComponent(repo)}`)
-      .then(r => r.json())
-      .then(d => setTags(d.tags || []))
-      .catch(() => {});
-  };
-
-  const openTagMode = () => {
-    setTagOpen(false);
-    setTagMode(true);
-    setTagName('');
-    setTimeout(() => tagInputRef.current?.focus(), 0);
-  };
-
-  const toggleTagOpen = () => {
-    if (!tagOpen) loadTags();
-    setTagOpen(v => !v);
-  };
-
-  const submitTag = async () => {
-    const t = tagName.trim();
-    if (!t || !repo) return;
-    setTagMode(false);
-    setTagName('');
-    setBusy('tag');
-    try {
-      const res = await fetch('/api/git/tag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, tag: t }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success('Tag pushed', { description: data.result || 'Done' });
-    } catch (e) {
-      toast.error('Tag failed', { description: String(e) });
-    } finally { setBusy(null); }
-  };
-
   const openClone = () => {
+    setOpen(false);
     setCloneOpen(true);
     setCloneRemote('');
     setCloneName('');
@@ -204,6 +161,11 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   return (
     <>
     <header className="h-11 flex items-center gap-3 px-4 bg-[var(--bg-panel)] border-b border-[var(--border-subtle)]/60 flex-shrink-0 select-none">
+      {/* Logo */}
+      <div className="flex items-center gap-2 flex-shrink-0 mr-1">
+        <span className="text-sm font-medium text-foreground whitespace-nowrap">git <span className="text-[#f97316]">browse</span></span>
+        <span className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+      </div>
       {/* Repo + branch */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {repo ? (
@@ -223,30 +185,46 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         )}
       </div>
 
-      {/* Recent */}
+      {/* Open repo: recent + clone */}
       <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen(v => !v)}
           className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
         >
-          Recent
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="flex-shrink-0">
+            <path d="M1 3.5A1.5 1.5 0 012.5 2h3.764c.69 0 1.35.28 1.837.78L9 3.5h4.5A1.5 1.5 0 0115 5v.5H1V3.5zM1 7v5.5A1.5 1.5 0 002.5 14h11a1.5 1.5 0 001.5-1.5V7H1z"/>
+          </svg>
+          Open
           <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
         </button>
-        {open && recent.length > 0 && (
+        {open && (
           <div className="absolute right-0 top-9 z-50 w-80 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden">
-            <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Recent</div>
-            <div className="max-h-52 overflow-y-auto pb-1.5">
-              {recent.map(r => (
-                <button key={r} onClick={() => { onRepoSelect(r); setOpen(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-soft)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors text-left"
-                >
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-dim)] flex-shrink-0">
-                    <circle cx="3" cy="3" r="2"/><circle cx="9" cy="9" r="2"/><path d="M3 5v1a3 3 0 003 3h.5"/>
-                  </svg>
-                  <span className="truncate">{r}</span>
-                </button>
-              ))}
-            </div>
+            {recent.length > 0 && (
+              <>
+                <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Recent</div>
+                <div className="max-h-52 overflow-y-auto pb-1.5">
+                  {recent.map(r => (
+                    <button key={r} onClick={() => { onRepoSelect(r); setOpen(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-soft)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors text-left"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-dim)] flex-shrink-0">
+                        <circle cx="3" cy="3" r="2"/><circle cx="9" cy="9" r="2"/><path d="M3 5v1a3 3 0 003 3h.5"/>
+                      </svg>
+                      <span className="truncate">{r}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="h-px bg-[var(--border-subtle)]/60" />
+              </>
+            )}
+            <button onClick={openClone}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--text-soft)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors text-left"
+            >
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-[var(--text-dim)] flex-shrink-0">
+                <path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2 13h12"/>
+              </svg>
+              Clone repository…
+            </button>
           </div>
         )}
       </div>
@@ -266,14 +244,6 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={openClone}
-          disabled={busy !== null}
-          className="h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          {busy === 'clone' ? '…' : 'Clone'}
-        </button>
-
         {cloneOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setCloneOpen(false)}>
             <div className="bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl w-[400px] p-5" onClick={e => e.stopPropagation()}>
@@ -387,73 +357,47 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           </div>
         )}
 
-        {[{ id: 'fetch', label: 'Fetch' }, { id: 'pull', label: 'Pull' }, { id: 'push', label: 'Push' }].map(({ id, label }) => (
-          <button key={id}
-            disabled={!repo || busy !== null}
-            onClick={() => run(id as 'fetch' | 'pull' | 'push')}
-            className="h-7 px-3 rounded-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            {busy === id ? '…' : label}
-          </button>
-        ))}
-        {tagMode ? (
-          <form onSubmit={e => { e.preventDefault(); submitTag(); }} className="flex items-center gap-1">
-            <input
-              ref={tagInputRef}
-              value={tagName}
-              onChange={e => setTagName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Escape') { setTagMode(false); setTagName(''); } }}
-              placeholder="v1.0.0"
-              className="h-7 w-24 px-2 rounded-md text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
-            />
-            <button type="submit" disabled={!tagName.trim()}
-              className="h-7 px-2 rounded-md text-xs font-medium text-primary hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        {/* Sync split button: Pull is primary, Fetch/Push under the caret */}
+        <div className="relative" ref={syncRef}>
+          <div className="flex items-center rounded-md border border-[var(--border-subtle)]/60">
+            <button
+              disabled={!repo || busy !== null}
+              onClick={() => run('pull')}
+              title="git pull"
+              className="h-7 px-3 rounded-l-md text-xs font-medium text-[var(--text-soft)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
-              Push
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 2v9M4.5 7.5L8 11l3.5-3.5M2 14h12"/>
+              </svg>
+              {busy === 'pull' ? 'Pulling…' : busy === 'fetch' ? 'Fetching…' : busy === 'push' ? 'Pushing…' : 'Pull'}
             </button>
-            <button type="button" onClick={() => { setTagMode(false); setTagName(''); }}
-              className="h-7 px-2 rounded-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+            <button
+              disabled={!repo || busy !== null}
+              onClick={() => setSyncOpen(v => !v)}
+              title="More sync actions"
+              className="h-7 px-1 rounded-r-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-[var(--border-subtle)]/40"
             >
-              ✕
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
             </button>
-          </form>
-        ) : (
-          <div className="relative" ref={tagRef}>
-            <div className="flex items-center">
-              <button
-                disabled={!repo || busy !== null}
-                onClick={openTagMode}
-                className="h-7 px-3 rounded-l-md text-xs font-medium text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                {busy === 'tag' ? '…' : 'Tag'}
-              </button>
-              <button
-                disabled={!repo || busy !== null}
-                onClick={toggleTagOpen}
-                className="h-7 px-1 rounded-r-md text-xs text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-[var(--border-subtle)]/40"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
-              </button>
-            </div>
-            {tagOpen && (
-              <div className="absolute right-0 top-9 z-50 w-64 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden">
-                <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Tags</div>
-                {tags.length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-[var(--text-dim)]">No tags found</div>
-                ) : (
-                  <div className="max-h-52 overflow-y-auto pb-1.5">
-                    {tags.map(t => (
-                      <div key={t.name} className="flex flex-col px-3 py-1.5 hover:bg-[var(--bg-raised)] transition-colors">
-                        <span className="text-xs font-medium text-foreground">{t.name}</span>
-                        {t.date && <span className="text-[10px] text-[var(--text-dim)]">{t.date}</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
-        )}
+          {syncOpen && (
+            <div className="absolute right-0 top-9 z-50 w-44 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden py-1">
+              {([
+                ['fetch', 'Fetch', 'git fetch'],
+                ['pull', 'Pull', 'git pull'],
+                ['push', 'Push', 'git push'],
+              ] as const).map(([id, label, hint]) => (
+                <button key={id}
+                  onClick={() => { setSyncOpen(false); run(id); }}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-[var(--text-soft)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors text-left"
+                >
+                  <span className="font-medium">{label}</span>
+                  <span className="text-[10px] font-mono text-[var(--text-dim)]">{hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </header>
 
