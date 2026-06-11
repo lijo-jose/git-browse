@@ -115,6 +115,12 @@ export function getCommitFiles(repoPath: string, commit: string): CommitFile[] {
 
 // ── Diff ─────────────────────────────────────────────────────────────────────
 
+export async function getSyncStatus(repoPath: string): Promise<{ ahead: number; behind: number; tracking: string | null }> {
+  const git = getGit(repoPath);
+  const s = await git.status();
+  return { ahead: s.ahead, behind: s.behind, tracking: s.tracking };
+}
+
 export async function getDiff(
   repoPath: string,
   file?: string,
@@ -201,6 +207,21 @@ export async function getBranches(repoPath: string): Promise<BranchInfo[]> {
       lastCommit: subjectParts.join('\x00'), // re-join in the impossible case subject had NUL
     };
   });
+}
+
+// For each local branch, how far it has diverged from the current HEAD:
+// ahead = commits the branch has that HEAD lacks, behind = commits HEAD has that the branch lacks.
+export async function getBranchDivergence(repoPath: string): Promise<Record<string, { ahead: number; behind: number }>> {
+  const branches = await getBranches(repoPath);
+  const out: Record<string, { ahead: number; behind: number }> = {};
+  for (const b of branches.filter(br => !br.remote && !br.current)) {
+    try {
+      const raw = execSync(`git rev-list --left-right --count HEAD..."${b.name}"`, { cwd: repoPath, encoding: 'utf8' });
+      const [behind, ahead] = raw.trim().split(/\s+/).map(Number);
+      if (ahead > 0 || behind > 0) out[b.name] = { ahead, behind };
+    } catch { /* skip branches that can't be compared (e.g. unborn) */ }
+  }
+  return out;
 }
 
 export async function checkoutBranch(repoPath: string, branch: string): Promise<void> {

@@ -27,6 +27,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   const [interactiveBase, setInteractiveBase] = useState<string | undefined>(undefined);
   const [contextMenu, setContextMenu] = useState<{ branch: Branch; x: number; y: number } | null>(null);
   const [tags, setTags] = useState<{ name: string; date: string; subject: string }[]>([]);
+  const [divergence, setDivergence] = useState<Record<string, { ahead: number; behind: number }>>({});
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [tagName, setTagName] = useState('');
   const [tagging, setTagging] = useState(false);
@@ -43,6 +44,10 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       .then(r => r.json())
       .then(d => setTags(d.tags || []))
       .catch(() => {});
+    fetch(`/api/git/branch-divergence?repo=${encodeURIComponent(repo)}`)
+      .then(r => r.json())
+      .then(d => setDivergence(d.divergence || {}))
+      .catch(() => setDivergence({}));
   };
 
   const doTag = async () => {
@@ -199,6 +204,15 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         <span className="text-xs font-medium truncate flex-1" style={{ color: b.current ? 'oklch(0.74 0.17 150)' : 'var(--foreground)' }}>{b.name}</span>
         {b.current && (
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-wide bg-emerald-500/15 text-emerald-600 ring-1 ring-emerald-500/25">HEAD</span>
+        )}
+        {!b.current && !b.remote && divergence[b.name] && (
+          <span
+            className="flex items-center gap-1 text-[9px] font-bold flex-shrink-0"
+            title={`vs ${currentBranch}: ${divergence[b.name].ahead} ahead · ${divergence[b.name].behind} behind`}
+          >
+            {divergence[b.name].ahead > 0 && <span style={{ color: 'oklch(0.74 0.15 80)' }}>↑{divergence[b.name].ahead}</span>}
+            {divergence[b.name].behind > 0 && <span style={{ color: 'var(--text-dim)' }}>↓{divergence[b.name].behind}</span>}
+          </span>
         )}
         {onCompare && !b.current && (
           <button

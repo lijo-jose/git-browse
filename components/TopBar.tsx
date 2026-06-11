@@ -33,12 +33,22 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [cloneProgress, setCloneProgress] = useState<string | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
   const [upstreamPrompt, setUpstreamPrompt] = useState(false);
+  const [sync, setSync] = useState<{ ahead: number; behind: number; tracking: string | null } | null>(null);
+
+  const loadSyncStatus = (path: string | null) => {
+    if (!path) { setSync(null); return; }
+    fetch(`/api/git/sync-status?repo=${encodeURIComponent(path)}`)
+      .then(r => r.json())
+      .then(d => setSync(d.error ? null : d))
+      .catch(() => setSync(null));
+  };
   const ref = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!repo) { setBranch(''); setRepoName(''); return; }
+    if (!repo) { setBranch(''); setRepoName(''); setSync(null); return; }
     setRepoName(repo.split('/').pop() || repo);
+    loadSyncStatus(repo);
     fetch(`/api/git/branches?repo=${encodeURIComponent(repo)}`)
       .then(r => r.json())
       .then(d => {
@@ -118,6 +128,15 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     }
   };
 
+  // Keep ahead/behind fresh: refocus + light polling catch commits made in-app or outside
+  useEffect(() => {
+    if (!repo) return;
+    const onFocus = () => loadSyncStatus(repo);
+    window.addEventListener('focus', onFocus);
+    const t = setInterval(onFocus, 60_000);
+    return () => { window.removeEventListener('focus', onFocus); clearInterval(t); };
+  }, [repo]);
+
   // Commands from the global palette (⌘K)
   useEffect(() => {
     const fn = (e: Event) => {
@@ -160,7 +179,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       }
     } catch (e) {
       toast.error(`${action} failed`, { description: String(e) });
-    } finally { setBusy(null); }
+    } finally { setBusy(null); loadSyncStatus(repo); }
   };
 
   const pushWithUpstream = async () => {
@@ -178,7 +197,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       toast.success('Pushed', { description: data.result || 'Done' });
     } catch (e) {
       toast.error('push failed', { description: String(e) });
-    } finally { setBusy(null); }
+    } finally { setBusy(null); loadSyncStatus(repo); }
   };
 
   return (
@@ -393,6 +412,12 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
                 <path d="M8 2v9M4.5 7.5L8 11l3.5-3.5M2 14h12"/>
               </svg>
               {busy === 'pull' ? 'Pulling…' : busy === 'fetch' ? 'Fetching…' : busy === 'push' ? 'Pushing…' : 'Pull'}
+              {!busy && sync && (sync.behind > 0 || sync.ahead > 0) && (
+                <span className="flex items-center gap-1 text-[10px] font-semibold" title={`${sync.behind} behind · ${sync.ahead} ahead of ${sync.tracking ?? 'upstream'}`}>
+                  {sync.behind > 0 && <span style={{ color: 'var(--primary)' }}>↓{sync.behind}</span>}
+                  {sync.ahead > 0 && <span style={{ color: 'oklch(0.74 0.15 80)' }}>↑{sync.ahead}</span>}
+                </span>
+              )}
             </button>
             <button
               disabled={!repo || busy !== null}
