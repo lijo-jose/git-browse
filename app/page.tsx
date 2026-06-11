@@ -39,12 +39,16 @@ export default function Home() {
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // don't hijack browser shortcuts like ⌘P
     if (e.key.toLowerCase() === 'r' && repo) { const r = repo; setRepo(null); setTimeout(() => setRepo(r), 50); }
     else if (e.key.toLowerCase() === 'b') setActiveTab('branches');
     else if (e.key.toLowerCase() === 'l') setActiveTab('log');
     else if (e.key.toLowerCase() === 'c') setActiveTab('changes');
     else if (e.key.toLowerCase() === 'd') setShowDiff(v => !v);
     else if (e.key.toLowerCase() === 'e') setShowSidebar(v => !v);
+    else if (e.key.toLowerCase() === 'p' && repo) window.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: 'sync:push' }));
+    else if (e.key.toLowerCase() === 'u' && repo) window.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: 'sync:pull' }));
+    else if (e.key.toLowerCase() === 't' && repo) window.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: 'tag:new' }));
   }, [repo]);
 
   useEffect(() => {
@@ -179,7 +183,7 @@ export default function Home() {
       <footer className="h-6 flex items-center gap-4 px-4 text-[10px] font-medium tracking-wide flex-shrink-0" style={{ background: 'var(--statusbar-bg)', color: 'oklch(0.97 0 0)' }}>
         <span className="font-semibold">⌘K — all commands</span>
         <span className="opacity-40">·</span>
-        <span>R refresh · E explorer · D diff · B/L/C tabs · right-click folder to pin</span>
+        <span>R refresh · E explorer · D diff · B/L/C tabs · U pull · P push · T tag</span>
         <div className="ml-auto flex items-center gap-3">
           <a href="https://github.com/lijo-jose" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 transition-opacity flex items-center gap-1">
             <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
