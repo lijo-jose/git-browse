@@ -63,6 +63,7 @@ export default function CommandPalette() {
     { id: 'sync:pull',  group: 'Git', title: 'Pull',  hint: 'git pull' },
     { id: 'sync:fetch', group: 'Git', title: 'Fetch', hint: 'git fetch' },
     { id: 'sync:push',  group: 'Git', title: 'Push',  hint: 'git push' },
+    { id: 'tag:new',    group: 'Git', title: 'Create tag…', keywords: 'tag release version', hint: 'git tag' },
     { id: 'clone',      group: 'Git', title: 'Clone repository…' },
     { id: 'refresh',    group: 'Git', title: 'Refresh repository', hint: 'R' },
 

@@ -57,6 +57,11 @@ export default function Home() {
     const fn = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       if (id.startsWith('tab:')) setActiveTab(id.slice(4));
+      else if (id === 'tag:new') {
+        // Branches tab must mount before BranchList can receive the dialog-open event
+        setActiveTab('branches');
+        setTimeout(() => window.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: 'tag:open-dialog' })), 200);
+      }
       else if (id === 'toggle:diff') setShowDiff(v => !v);
       else if (id === 'toggle:explorer') setShowSidebar(v => !v);
       else if (id === 'guide') openGuide();

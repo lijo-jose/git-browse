@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import InteractiveRebaseDialog from './InteractiveRebaseDialog';
+import { COMMAND_EVENT } from '@/components/CommandPalette';
 
 interface Branch { name: string; current: boolean; remote: boolean; lastCommit?: string; lastCommitDate?: string; }
 type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string };
@@ -70,6 +71,15 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     const close = () => setContextMenu(null);
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
+  }, []);
+
+  // "Create tag…" from the ⌘K palette
+  useEffect(() => {
+    const fn = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === 'tag:open-dialog') setTagDialogOpen(true);
+    };
+    window.addEventListener(COMMAND_EVENT, fn);
+    return () => window.removeEventListener(COMMAND_EVENT, fn);
   }, []);
 
   const doAction = async () => {
@@ -237,7 +247,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
             <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
             </svg>
-            new
+            New tag
           </button>
         </div>
         {tags.length === 0 ? (
