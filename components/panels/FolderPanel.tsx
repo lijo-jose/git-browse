@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
-interface FsEntry { name: string; path: string; isDirectory: boolean; isGitRepo: boolean; isIgnored?: boolean; }
+interface FsEntry { name: string; path: string; isDirectory: boolean; isGitRepo: boolean; branch?: string; isIgnored?: boolean; }
 interface Props { onRepoSelect: (p: string) => void; selectedRepo: string | null; navigateTo?: string | null; }
 
 const FAV_KEY = 'git-browser-favorites';
@@ -232,9 +232,15 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
                 </button>
               )}
               {e.isGitRepo && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/20 tracking-wide flex-shrink-0">
-                  GIT
-                </span>
+                e.branch && !['main', 'master'].includes(e.branch) ? (
+                  <span title={e.branch} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/20 flex-shrink-0 max-w-[80px] truncate">
+                    {e.branch}
+                  </span>
+                ) : (
+                  <span title={e.branch} className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 max-w-[80px] truncate" style={{ background: 'color-mix(in oklch, var(--text-dim) 10%, transparent)', color: 'var(--text-dim)', border: '1px solid color-mix(in oklch, var(--text-dim) 20%, transparent)' }}>
+                    {e.branch ?? 'GIT'}
+                  </span>
+                )
               )}
               {e.isIgnored && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: 'color-mix(in oklch, var(--text-dim) 10%, transparent)', color: 'var(--text-dim)', border: '1px solid color-mix(in oklch, var(--text-dim) 20%, transparent)' }}>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { pushSearchHistory, getSearchHistory, removeSearchHistory, clearSearchHistory, type SearchHistoryEntry } from '@/lib/searchHistory';
 
 type Mode = 'grep' | 'find';
 
@@ -19,33 +20,53 @@ export default function SearchPage() {
   const [matches, setMatches] = useState<GrepMatch[]>([]);
   const [paths, setPaths] = useState<string[]>([]);
   const [truncated, setTruncated] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [searched, setSearched] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
+  const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
 
   useEffect(() => {
     fetch('/api/system')
       .then(r => r.json())
       .then(d => setUnsupported(d.platform === 'win32'))
       .catch(() => {});
+    setHistory(getSearchHistory());
   }, []);
 
-  const run = useCallback(async () => {
-    if (!dir || !pattern) return;
+  const run = useCallback(async (over?: Partial<Pick<SearchHistoryEntry, 'mode' | 'dir' | 'pattern' | 'ignoreCase' | 'regex'>>) => {
+    const q = {
+      mode: over?.mode ?? mode,
+      dir: over?.dir ?? dir,
+      pattern: over?.pattern ?? pattern,
+      ignoreCase: over?.ignoreCase ?? ignoreCase,
+      regex: over?.regex ?? regex,
+    };
+    if (!q.dir || !q.pattern) return;
     setLoading(true); setError(''); setSearched(true);
     try {
-      const params = new URLSearchParams({ dir, pattern });
-      if (mode === 'grep') {
-        if (ignoreCase) params.set('ignoreCase', '1');
-        if (regex) params.set('regex', '1');
+      const params = new URLSearchParams({ dir: q.dir, pattern: q.pattern });
+      if (q.mode === 'grep') {
+        if (q.ignoreCase) params.set('ignoreCase', '1');
+        if (q.regex) params.set('regex', '1');
       }
-      const d = await fetch(`/api/search/${mode}?${params}`).then(r => r.json());
+      const d = await fetch(`/api/search/${q.mode}?${params}`).then(r => r.json());
       if (d.error) { setError(d.error); setMatches([]); setPaths([]); return; }
-      setMatches(d.matches || []);
+      const ms: GrepMatch[] = d.matches || [];
+      setMatches(ms);
       setPaths(d.paths || []);
       setTruncated(!!d.truncated);
+      // Long result sets (more than ~2 screens of lines) start collapsed
+      setCollapsed(ms.length > 80 ? new Set(ms.map(m => m.file)) : new Set());
+      setHistory(pushSearchHistory(q));
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }, [dir, pattern, mode, ignoreCase, regex]);
+
+  const restore = (h: SearchHistoryEntry) => {
+    setMode(h.mode); setDir(h.dir); setPattern(h.pattern);
+    setIgnoreCase(h.ignoreCase); setRegex(h.regex);
+    run(h);
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, GrepMatch[]>();
@@ -123,7 +144,7 @@ export default function SearchPage() {
             )}
 
             <button
-              onClick={run}
+              onClick={() => run()}
               disabled={!dir || !pattern || loading}
               className="w-full h-9 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               style={{ background: 'var(--primary)' }}
@@ -137,6 +158,37 @@ export default function SearchPage() {
               {count} {mode === 'grep' ? `match${count === 1 ? '' : 'es'} in ${grouped.length} file${grouped.length === 1 ? '' : 's'}` : `file${count === 1 ? '' : 's'}`}
               {truncated && ' (truncated to first 500)'}
             </p>
+          )}
+
+          {history.length > 0 && (
+            <div className="px-3 pt-3 pb-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-dim)' }}>Recent searches</p>
+                <button onClick={() => { clearSearchHistory(); setHistory([]); }}
+                  className="text-[10px] font-semibold transition-colors hover:opacity-80" style={{ color: 'var(--text-dim)' }}>Clear</button>
+              </div>
+              {history.map(h => (
+                <div key={h.id} className="group flex items-center gap-1.5 rounded-lg px-2 py-1.5 cursor-pointer transition-colors"
+                  onClick={() => restore(h)}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-raised)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                >
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 uppercase"
+                    style={{ background: 'var(--bg-raised)', color: h.mode === 'grep' ? 'var(--primary)' : '#34d399' }}>{h.mode}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono text-[11px] truncate" style={{ color: 'var(--foreground)' }}>{h.pattern}</p>
+                    <p className="font-mono text-[9px] truncate" style={{ color: 'var(--text-dim)' }}>{h.dir}</p>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); removeSearchHistory(h.id); setHistory(getSearchHistory()); }}
+                    className="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                    style={{ color: 'var(--text-dim)' }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 3L3 9M3 3l6 6"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </aside>
 
@@ -166,20 +218,47 @@ export default function SearchPage() {
             </div>
           ) : (
             <div className="p-3 space-y-3">
-              {grouped.map(([file, ms]) => (
+              {grouped.length > 1 && (
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setCollapsed(new Set())}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-md transition-colors"
+                    style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>Expand all</button>
+                  <button onClick={() => setCollapsed(new Set(grouped.map(([f]) => f)))}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-md transition-colors"
+                    style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>Collapse all</button>
+                </div>
+              )}
+              {grouped.map(([file, ms]) => {
+                const isCollapsed = collapsed.has(file);
+                return (
                 <div key={file} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
-                  <div className="flex items-center gap-2 px-3 py-2" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <button
+                    onClick={() => setCollapsed(prev => {
+                      const next = new Set(prev);
+                      if (next.has(file)) next.delete(file); else next.add(file);
+                      return next;
+                    })}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                    style={{ background: 'var(--bg-panel)', borderBottom: isCollapsed ? 'none' : '1px solid var(--border-subtle)' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-raised)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-panel)'}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                      className="shrink-0 transition-transform duration-150"
+                      style={{ color: 'var(--text-dim)', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+                      <path d="M4 2l4 4-4 4"/>
+                    </svg>
                     <span className="font-mono text-[11px] font-semibold truncate" style={{ color: 'var(--primary)' }}>{relTo(file)}</span>
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>{ms.length}</span>
-                  </div>
-                  {ms.map(m => (
+                  </button>
+                  {!isCollapsed && ms.map(m => (
                     <div key={`${m.line}-${m.text}`} className="flex gap-3 px-3 py-1 font-mono text-[11px]">
                       <span className="shrink-0 w-10 text-right" style={{ color: 'var(--text-dim)' }}>{m.line}</span>
                       <span className="truncate" style={{ color: 'var(--foreground)' }}>{m.text.trimStart()}</span>
                     </div>
                   ))}
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </main>

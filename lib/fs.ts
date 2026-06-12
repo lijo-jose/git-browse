@@ -8,6 +8,7 @@ export interface FsEntry {
   path: string;
   isDirectory: boolean;
   isGitRepo: boolean;
+  branch?: string;
   isIgnored?: boolean;
   size?: number;
   modified?: string;
@@ -25,6 +26,25 @@ function getIgnoredNames(dirPath: string, names: string[]): Set<string> {
     return new Set(out.split('\0').map(p => path.basename(p)).filter(Boolean));
   } catch {
     return new Set();
+  }
+}
+
+function readBranch(repoPath: string): string | undefined {
+  try {
+    let gitDir = path.join(repoPath, '.git');
+    const stat = fs.statSync(gitDir);
+    if (stat.isFile()) {
+      // Worktree/submodule: .git is a file pointing to the real git dir
+      const m = fs.readFileSync(gitDir, 'utf8').match(/^gitdir:\s*(.+)$/m);
+      if (!m) return undefined;
+      gitDir = path.resolve(repoPath, m[1].trim());
+    }
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    const ref = head.match(/^ref:\s*refs\/heads\/(.+)$/);
+    if (ref) return ref[1];
+    return head.slice(0, 7); // detached HEAD
+  } catch {
+    return undefined;
   }
 }
 
@@ -67,6 +87,7 @@ export function listDirectory(dirPath: string): FsEntry[] {
         path: fullPath,
         isDirectory: isDir,
         isGitRepo,
+        branch: isGitRepo ? readBranch(fullPath) : undefined,
         isIgnored: ignoredNames.has(e.name),
         size: stat?.size,
         modified: stat?.mtime.toISOString(),
