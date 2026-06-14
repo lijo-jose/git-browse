@@ -190,8 +190,8 @@ export default function Home() {
             lijo-jose
           </a>
           <span className="opacity-40">·</span>
-          <a href="https://ai.lijojose.com" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 transition-opacity">
-            ai.lijojose.com
+          <a href="https://www.lijojose.com" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 transition-opacity">
+            www.lijojose.com
           </a>
         </div>
       </footer>
