@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { loadGroups, saveGroups, createGroup, type RepoGroup } from '@/lib/repoGroups';
 
 interface FsEntry { name: string; path: string; isDirectory: boolean; isGitRepo: boolean; branch?: string; isIgnored?: boolean; }
 interface Props { onRepoSelect: (p: string) => void; selectedRepo: string | null; navigateTo?: string | null; }
+
+interface RepoStatus { path: string; name: string; branch: string; ahead: number; behind: number; dirty: boolean; error?: boolean; }
 
 const FAV_KEY = 'git-browser-favorites';
 const COMPARE_LEFT_KEY = 'git-browser-compare-left';
@@ -22,6 +25,19 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
   const [resolved, setResolved] = useState('');
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [compareLeft, setCompareLeft] = useState<{ name: string; path: string } | null>(null);
+  const [groups, setGroups] = useState<RepoGroup[]>([]);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupPaths, setNewGroupPaths] = useState<string[]>([]);
+  const [addRepoInput, setAddRepoInput] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupPaths, setEditGroupPaths] = useState<string[]>([]);
+  const [editAddInput, setEditAddInput] = useState('');
+  const [ctxGroupSubmenu, setCtxGroupSubmenu] = useState(false);
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [groupStatuses, setGroupStatuses] = useState<Record<string, RepoStatus[]>>({});
+  const [groupLoading, setGroupLoading] = useState<string | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -48,6 +64,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
     try {
       const s = localStorage.getItem(FAV_KEY); if (s) setFavs(JSON.parse(s));
       const cl = localStorage.getItem(COMPARE_LEFT_KEY); if (cl) setCompareLeft(JSON.parse(cl));
+      setGroups(loadGroups());
     } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -102,6 +119,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
     ev.preventDefault();
     ev.stopPropagation();
     setCtxMenu({ x: ev.clientX, y: ev.clientY, entry });
+    setCtxGroupSubmenu(false);
   };
 
   const copyPath = (path: string) => {
@@ -135,6 +153,92 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
   };
 
   const isPinned = (path: string) => favs.some(f => f.path === path);
+
+  const addCurrentToNewGroup = () => {
+    if (selectedRepo && !newGroupPaths.includes(selectedRepo)) {
+      setNewGroupPaths(prev => [...prev, selectedRepo]);
+    }
+  };
+
+  const saveNewGroup = () => {
+    const name = newGroupName.trim();
+    if (!name || newGroupPaths.length === 0) return;
+    const next = [...groups, createGroup(name, newGroupPaths)];
+    setGroups(next);
+    saveGroups(next);
+    setNewGroupOpen(false);
+    setNewGroupName('');
+    setNewGroupPaths([]);
+    setAddRepoInput('');
+    toast.success('Group created', { description: name });
+  };
+
+  const deleteGroup = (id: string) => {
+    const next = groups.filter(g => g.id !== id);
+    setGroups(next);
+    saveGroups(next);
+  };
+
+  const openEditGroup = (g: RepoGroup) => {
+    setEditingGroupId(g.id);
+    setEditGroupName(g.name);
+    setEditGroupPaths([...g.repoPaths]);
+    setEditAddInput('');
+    setNewGroupOpen(false);
+  };
+
+  const saveEditGroup = () => {
+    const name = editGroupName.trim();
+    if (!name || editGroupPaths.length === 0) return;
+    const next = groups.map(g => g.id === editingGroupId ? { ...g, name, repoPaths: editGroupPaths } : g);
+    setGroups(next);
+    saveGroups(next);
+    setEditingGroupId(null);
+    toast.success('Group updated', { description: name });
+  };
+
+  const fetchGroupStatuses = async (g: RepoGroup) => {
+    setGroupLoading(g.id);
+    const results = await Promise.all(
+      g.repoPaths.map(async (repoPath): Promise<RepoStatus> => {
+        const name = repoPath.split('/').pop() || repoPath;
+        try {
+          const [branchRes, syncRes, statusRes] = await Promise.all([
+            fetch(`/api/git/branches?repo=${encodeURIComponent(repoPath)}`).then(r => r.json()),
+            fetch(`/api/git/sync-status?repo=${encodeURIComponent(repoPath)}`).then(r => r.json()),
+            fetch(`/api/git/status?repo=${encodeURIComponent(repoPath)}`).then(r => r.json()),
+          ]);
+          const cur = (branchRes.branches || []).find((b: { current: boolean }) => b.current) as { name: string } | undefined;
+          return { path: repoPath, name, branch: cur?.name || '—', ahead: syncRes.ahead ?? 0, behind: syncRes.behind ?? 0, dirty: (statusRes.files || []).length > 0 };
+        } catch {
+          return { path: repoPath, name, branch: '—', ahead: 0, behind: 0, dirty: false, error: true };
+        }
+      })
+    );
+    setGroupStatuses(prev => ({ ...prev, [g.id]: results }));
+    setGroupLoading(null);
+  };
+
+  const toggleGroupExpand = (g: RepoGroup) => {
+    if (expandedGroupId === g.id) {
+      setExpandedGroupId(null);
+    } else {
+      setExpandedGroupId(g.id);
+      if (!groupStatuses[g.id]) fetchGroupStatuses(g);
+    }
+  };
+
+  const addRepoToGroup = (groupId: string, repoPath: string) => {
+    const next = groups.map(g =>
+      g.id === groupId && !g.repoPaths.includes(repoPath)
+        ? { ...g, repoPaths: [...g.repoPaths, repoPath] }
+        : g
+    );
+    setGroups(next);
+    saveGroups(next);
+    const g = next.find(g => g.id === groupId);
+    toast.success(`Added to "${g?.name}"`, { description: repoPath.split('/').pop() });
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -173,6 +277,207 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
           ))}
         </div>
       )}
+
+      {/* Groups */}
+      <div className="py-1.5" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+        <div className="flex items-center px-4 mb-1">
+          <p className="flex-1 text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--text-dim)' }}>Groups</p>
+          <button
+            onClick={() => { setNewGroupOpen(v => !v); setNewGroupName(''); setNewGroupPaths(selectedRepo ? [selectedRepo] : []); setAddRepoInput(''); }}
+            title="New group"
+            className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <line x1="5" y1="1" x2="5" y2="9"/><line x1="1" y1="5" x2="9" y2="5"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* New group form */}
+        {newGroupOpen && (
+          <div className="mx-2 mb-1.5 p-2.5 rounded-lg" style={{ background: 'color-mix(in oklch, var(--bg-raised) 50%, transparent)', border: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+            <input
+              autoFocus
+              value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)}
+              placeholder="Group name…"
+              className="w-full h-7 px-2.5 rounded-md text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary mb-2"
+            />
+            <p className="text-[10px] mb-1" style={{ color: 'var(--text-dim)' }}>Repos in this group:</p>
+            {newGroupPaths.map(p => (
+              <div key={p} className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] truncate flex-1 font-medium" style={{ color: 'var(--text-soft)' }}>{p.split('/').pop()}</span>
+                <button onClick={() => setNewGroupPaths(prev => prev.filter(x => x !== p))} className="text-[10px] text-[var(--text-dim)] hover:text-rose-400">✕</button>
+              </div>
+            ))}
+            <div className="flex gap-1 mt-1.5">
+              <input
+                value={addRepoInput}
+                onChange={e => setAddRepoInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const v = addRepoInput.trim();
+                    if (v && !newGroupPaths.includes(v)) setNewGroupPaths(prev => [...prev, v]);
+                    setAddRepoInput('');
+                  }
+                }}
+                placeholder="Add repo path…"
+                className="flex-1 h-6 px-2 rounded text-[10px] bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+              />
+              {selectedRepo && !newGroupPaths.includes(selectedRepo) && (
+                <button
+                  onClick={addCurrentToNewGroup}
+                  title="Add current repo"
+                  className="h-6 px-2 rounded text-[10px] text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] border border-[var(--border-subtle)] transition-colors"
+                >cur</button>
+              )}
+            </div>
+            <div className="flex gap-1 mt-2">
+              <button onClick={() => setNewGroupOpen(false)} className="flex-1 h-6 rounded text-[10px] text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors">Cancel</button>
+              <button
+                onClick={saveNewGroup}
+                disabled={!newGroupName.trim() || newGroupPaths.length === 0}
+                className="flex-1 h-6 rounded text-[10px] font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+              >Create</button>
+            </div>
+          </div>
+        )}
+
+        {groups.length === 0 && !newGroupOpen && (
+          <p className="px-4 text-[10px]" style={{ color: 'var(--text-dim)' }}>No groups yet</p>
+        )}
+
+        {groups.map(g => (
+          <div key={g.id}>
+            {editingGroupId === g.id ? (
+              /* ── Inline edit form ── */
+              <div className="mx-2 mb-1.5 p-2.5 rounded-lg" style={{ background: 'color-mix(in oklch, var(--bg-raised) 50%, transparent)', border: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+                <input
+                  autoFocus
+                  value={editGroupName}
+                  onChange={e => setEditGroupName(e.target.value)}
+                  placeholder="Group name…"
+                  className="w-full h-7 px-2.5 rounded-md text-xs bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary mb-2"
+                />
+                <p className="text-[10px] mb-1" style={{ color: 'var(--text-dim)' }}>Repos:</p>
+                {editGroupPaths.map(p => (
+                  <div key={p} className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-[10px] truncate flex-1 font-medium" style={{ color: 'var(--text-soft)' }}>{p.split('/').pop()}</span>
+                    <button onClick={() => setEditGroupPaths(prev => prev.filter(x => x !== p))} className="text-[10px] text-[var(--text-dim)] hover:text-rose-400 flex-shrink-0">✕</button>
+                  </div>
+                ))}
+                <div className="flex gap-1 mt-1.5">
+                  <input
+                    value={editAddInput}
+                    onChange={e => setEditAddInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const v = editAddInput.trim();
+                        if (v && !editGroupPaths.includes(v)) setEditGroupPaths(prev => [...prev, v]);
+                        setEditAddInput('');
+                      }
+                    }}
+                    placeholder="Add repo path…"
+                    className="flex-1 h-6 px-2 rounded text-[10px] bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-foreground placeholder:text-[var(--text-dim)] focus:outline-none focus:border-primary"
+                  />
+                  {selectedRepo && !editGroupPaths.includes(selectedRepo) && (
+                    <button
+                      onClick={() => setEditGroupPaths(prev => [...prev, selectedRepo!])}
+                      title="Add current repo"
+                      className="h-6 px-2 rounded text-[10px] text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] border border-[var(--border-subtle)] transition-colors"
+                    >cur</button>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-2">
+                  <button onClick={() => setEditingGroupId(null)} className="flex-1 h-6 rounded text-[10px] text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors">Cancel</button>
+                  <button
+                    onClick={saveEditGroup}
+                    disabled={!editGroupName.trim() || editGroupPaths.length === 0}
+                    className="flex-1 h-6 rounded text-[10px] font-medium bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                  >Save</button>
+                </div>
+              </div>
+            ) : (
+              /* ── Group row + accordion ── */
+              <>
+              <div className="group/row flex items-center gap-2 mx-2 px-2 py-1 rounded-lg cursor-pointer transition-colors"
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                onClick={() => toggleGroupExpand(g)}
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" style={{ color: 'var(--primary)' }}>
+                  <rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="1" width="5.5" height="5.5" rx="1"/>
+                  <rect x="1" y="9.5" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1"/>
+                </svg>
+                <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--foreground)' }}>{g.name}</span>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="flex-shrink-0 transition-transform duration-150"
+                  style={{ color: 'var(--text-dim)', transform: expandedGroupId === g.id ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                  <path d="M2 1l4 3-4 3z"/>
+                </svg>
+                <button
+                  onClick={e => { e.stopPropagation(); openEditGroup(g); }}
+                  title="Edit group"
+                  className="opacity-0 group-hover/row:opacity-100 transition-all w-4 h-4 flex items-center justify-center rounded hover:text-foreground flex-shrink-0"
+                  style={{ color: 'var(--text-dim)' }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8.5 1.5l2 2L3 11H1v-2L8.5 1.5z"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); deleteGroup(g.id); }}
+                  title="Delete group"
+                  className="opacity-0 group-hover/row:opacity-100 hover:text-rose-500 transition-all text-[10px] w-4 flex-shrink-0"
+                  style={{ color: 'var(--text-dim)' }}
+                >✕</button>
+              </div>
+              {/* Accordion: repo status rows */}
+              {expandedGroupId === g.id && (
+                <div className="mx-2 mb-1">
+                  {groupLoading === g.id
+                    ? g.repoPaths.map(p => (
+                      <div key={p} className="h-7 mb-0.5 rounded-lg animate-pulse" style={{ background: 'color-mix(in oklch, var(--bg-raised) 40%, transparent)' }} />
+                    ))
+                    : (groupStatuses[g.id] || []).map(s => (
+                      <div
+                        key={s.path}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer transition-colors"
+                        style={{ background: selectedRepo === s.path ? 'color-mix(in oklch, var(--primary) 10%, transparent)' : undefined }}
+                        onMouseEnter={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
+                        onMouseLeave={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = ''; }}
+                        onClick={() => onRepoSelect(s.path)}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                          <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/><circle cx="11" cy="3.5" r="1.5"/>
+                          <line x1="5" y1="5" x2="5" y2="11"/><path d="M5 6a3 3 0 003 3h2"/>
+                        </svg>
+                        <span className="text-[11px] font-medium truncate flex-1" style={{ color: selectedRepo === s.path ? 'var(--primary)' : 'var(--foreground)' }}>{s.name}</span>
+                        {s.error
+                          ? <span className="text-[9px]" style={{ color: 'oklch(0.65 0.2 25)' }}>err</span>
+                          : <>
+                            {s.dirty && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'oklch(0.75 0.18 80)' }} title="Has uncommitted changes" />}
+                            {s.behind > 0 && <span className="text-[9px] font-semibold flex-shrink-0" style={{ color: 'var(--primary)' }}>↓{s.behind}</span>}
+                            {s.ahead > 0 && <span className="text-[9px] font-semibold flex-shrink-0" style={{ color: 'oklch(0.74 0.15 80)' }}>↑{s.ahead}</span>}
+                            <span className="text-[9px] truncate flex-shrink-0 max-w-[48px]" style={{ color: 'var(--text-dim)' }}>{s.branch}</span>
+                          </>
+                        }
+                      </div>
+                    ))
+                  }
+                  <button
+                    onClick={e => { e.stopPropagation(); fetchGroupStatuses(g); }}
+                    className="w-full text-center text-[9px] py-0.5 rounded transition-colors mt-0.5"
+                    style={{ color: 'var(--text-dim)' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}
+                  >↺ refresh</button>
+                </div>
+              )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-0.5 px-4 py-2" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
@@ -274,6 +579,59 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
                 ? <CtxItem icon={<PinOffIcon />} label="Unpin" onClick={() => { unpin(ctxMenu.entry.path); setCtxMenu(null); }} />
                 : <CtxItem icon={<PinIcon />} label="Pin" onClick={() => { pin(ctxMenu.entry); setCtxMenu(null); }} />
               }
+              {ctxMenu.entry.isGitRepo && groups.length > 0 && (
+                <div className="relative">
+                  <button
+                    className="flex items-center gap-2.5 w-full px-3 py-1.5 text-xs text-left transition-colors"
+                    style={{ color: 'var(--text-soft)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 60%, transparent)'; setCtxGroupSubmenu(true); }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                  >
+                    <span className="flex-shrink-0 opacity-70">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="1" width="5.5" height="5.5" rx="1"/>
+                        <rect x="1" y="9.5" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1"/>
+                      </svg>
+                    </span>
+                    <span className="flex-1">Add to group</span>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="opacity-50"><path d="M2 1l4 3-4 3z"/></svg>
+                  </button>
+                  {ctxGroupSubmenu && (
+                    <div
+                      className="absolute left-full top-0 z-50 py-1 rounded-xl shadow-xl min-w-[160px]"
+                      style={{
+                        background: 'var(--bg-panel)',
+                        border: '1px solid color-mix(in oklch, var(--border-subtle) 80%, transparent)',
+                        boxShadow: '0 8px 32px color-mix(in oklch, black 30%, transparent)',
+                      }}
+                      onMouseEnter={() => setCtxGroupSubmenu(true)}
+                      onMouseLeave={() => setCtxGroupSubmenu(false)}
+                    >
+                      {groups.map(g => {
+                        const already = g.repoPaths.includes(ctxMenu.entry.path);
+                        return (
+                          <button
+                            key={g.id}
+                            disabled={already}
+                            onClick={() => { addRepoToGroup(g.id, ctxMenu.entry.path); setCtxMenu(null); setCtxGroupSubmenu(false); }}
+                            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            style={{ color: 'var(--text-soft)' }}
+                            onMouseEnter={e => { if (!already) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 60%, transparent)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 opacity-60">
+                              <rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="1" width="5.5" height="5.5" rx="1"/>
+                              <rect x="1" y="9.5" width="5.5" height="5.5" rx="1"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1"/>
+                            </svg>
+                            <span className="truncate flex-1">{g.name}</span>
+                            {already && <span className="text-[9px] opacity-50">added</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
               <CtxDivider />
               {compareLeft && compareLeft.path !== ctxMenu.entry.path ? (
                 <>

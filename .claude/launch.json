@@ -5,7 +5,8 @@
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3051
+      "port": 3051,
+      "autoPort": false
     }
   ]
 }
