@@ -238,6 +238,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
     saveGroups(next);
     const g = next.find(g => g.id === groupId);
     toast.success(`Added to "${g?.name}"`, { description: repoPath.split('/').pop() });
+    if (g && expandedGroupId === groupId) fetchGroupStatuses(g);
   };
 
   return (
