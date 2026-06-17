@@ -446,7 +446,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
                         style={{ background: selectedRepo === s.path ? 'color-mix(in oklch, var(--primary) 10%, transparent)' : undefined }}
                         onMouseEnter={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
                         onMouseLeave={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = ''; }}
-                        onClick={() => onRepoSelect(s.path)}
+                        onClick={() => { onRepoSelect(s.path); setCur(s.path); load(s.path); }}
                         onContextMenu={ev => openCtxMenu(ev, { name: s.name, path: s.path, isDirectory: true, isGitRepo: true })}
                       >
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" style={{ color: 'var(--text-dim)' }}>

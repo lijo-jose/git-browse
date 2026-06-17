@@ -16,7 +16,7 @@ A local Git repository browser built with Next.js. Browse commits, inspect diffs
 - **Git add, commit, and push** — stage files, write a commit message, and push without leaving the UI
 - **Create and push tags** — tag a commit and push the tag to the remote
 - **Themes** — switch between light, dark, and system themes
-- **Collapsible Explorer sidebar** — pin and unpin repositories for quick access
+- **Collapsible Explorer sidebar** — pin and unpin repositories for quick access; right-click any folder to open it in VS Code
 - **Repository groups** — organise pinned repos into named groups in the Explorer sidebar
 - **Active branch in Explorer** — each pinned repo shows its current branch at a glance
 - **Ahead/behind indicators** — sync button and branch list show how far ahead or behind the remote you are
