@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+interface FileCtxMenu { x: number; y: number; fullPath: string; }
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -177,7 +179,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
         {!hasFiles && <Empty label="Working tree clean" />}
         {staged.length > 0 && (
-          <Section label="Staged" files={staged} selected={selected} selectedFile={selectedFile}
+          <Section label="Staged" files={staged} repo={repo} selected={selected} selectedFile={selectedFile}
             onFileSelect={onFileSelect} onToggle={toggleSelect}
             onToggleAll={keys => {
               const allIn = keys.every(k => selected.has(k));
@@ -186,7 +188,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
           />
         )}
         {unstaged.length > 0 && (
-          <Section label="Unstaged" files={unstaged} selected={selected} selectedFile={selectedFile}
+          <Section label="Unstaged" files={unstaged} repo={repo} selected={selected} selectedFile={selectedFile}
             onFileSelect={onFileSelect} onToggle={toggleSelect}
             onToggleAll={keys => {
               const allIn = keys.every(k => selected.has(k));
@@ -339,15 +341,31 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   );
 }
 
-function Section({ label, files, selected, selectedFile, onFileSelect, onToggle, onToggleAll }: {
+function Section({ label, files, repo, selected, selectedFile, onFileSelect, onToggle, onToggleAll }: {
   label: string;
   files: GitFile[];
+  repo: string;
   selected: Set<string>;
   selectedFile?: string;
   onFileSelect: (f: string, s: boolean) => void;
   onToggle: (key: string) => void;
   onToggleAll: (keys: string[]) => void;
 }) {
+  const [ctxMenu, setCtxMenu] = useState<FileCtxMenu | null>(null);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('contextmenu', close);
+    document.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('contextmenu', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, [ctxMenu]);
+
   const keys = files.map(f => f.path);
   const allIn = keys.length > 0 && keys.every(k => selected.has(k));
   const someIn = keys.some(k => selected.has(k)) && !allIn;
@@ -368,6 +386,7 @@ function Section({ label, files, selected, selectedFile, onFileSelect, onToggle,
         const isSelected = selectedFile === f.path;
         const key = f.path;
         const checked = selected.has(key);
+        const fullPath = `${repo}/${f.path}`;
         return (
           <div key={`${f.path}-${f.staged}`}
             className="flex items-center gap-2 mx-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors"
@@ -377,6 +396,7 @@ function Section({ label, files, selected, selectedFile, onFileSelect, onToggle,
             }}
             onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
             onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = ''; }}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, fullPath }); }}
           >
             <input
               type="checkbox"
@@ -405,7 +425,69 @@ function Section({ label, files, selected, selectedFile, onFileSelect, onToggle,
           </div>
         );
       })}
+
+      {ctxMenu && (
+        <div
+          className="fixed z-50 py-1 rounded-xl shadow-xl min-w-[190px]"
+          style={{
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            background: 'var(--bg-panel)',
+            border: '1px solid color-mix(in oklch, var(--border-subtle) 80%, transparent)',
+            boxShadow: '0 8px 32px color-mix(in oklch, black 30%, transparent)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <FileCtxItem
+            icon={<CopyIcon />}
+            label="Copy Path"
+            onClick={() => {
+              navigator.clipboard.writeText(ctxMenu.fullPath).then(
+                () => toast.success('Copied', { description: ctxMenu.fullPath }),
+                () => toast.error('Copy failed'),
+              );
+              setCtxMenu(null);
+            }}
+          />
+          <FileCtxItem
+            icon={<VSCodeIcon />}
+            label="Open in VS Code"
+            onClick={() => { window.location.href = `vscode://file${ctxMenu.fullPath}?windowId=_blank`; setCtxMenu(null); }}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function FileCtxItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      className="flex items-center gap-2.5 w-full px-3 py-1.5 text-xs text-left transition-colors"
+      style={{ color: 'var(--text-soft)' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 60%, transparent)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+      onClick={onClick}
+    >
+      <span className="flex-shrink-0 opacity-70">{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/>
+    </svg>
+  );
+}
+
+function VSCodeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M11.5 1.5l-7 5.5-3-2.5L0 5.5v5l1.5 1 3-2.5 7 5.5 3-1.5V3L11.5 1.5zM13 11.5L7 7.5v-1l6-4v9z"/>
+    </svg>
   );
 }
 

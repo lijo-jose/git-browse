@@ -17,6 +17,15 @@ A local Git repository browser built with Next.js. Browse commits, inspect diffs
 - **Create and push tags** — tag a commit and push the tag to the remote
 - **Themes** — switch between light, dark, and system themes
 - **Collapsible Explorer sidebar** — pin and unpin repositories for quick access
+- **Repository groups** — organise pinned repos into named groups in the Explorer sidebar
+- **Active branch in Explorer** — each pinned repo shows its current branch at a glance
+- **Ahead/behind indicators** — sync button and branch list show how far ahead or behind the remote you are
+- **Git remote link** — top bar displays a clickable link to the repo's remote URL
+- **Compare files/folders** — side-by-side comparison of any two files or directories
+- **Git compare** — diff any two branches or commits
+- **Grep / search** — full-text search across the working tree
+- **Interactive rebase** — launch `git rebase -i` from the UI
+- **Git clone** — clone a remote repository and branch out directly from the UI
 - **User guide** — built-in help panel with keyboard shortcuts and usage tips
 
 ## Keyboard Shortcuts
@@ -29,6 +38,9 @@ A local Git repository browser built with Next.js. Browse commits, inspect diffs
 | `B` | Switch to Branches tab |
 | `C` | Switch to Changes tab |
 | `R` | Refresh current repository |
+| `P` | Push to remote |
+| `U` | Pull from remote |
+| `T` | Create a new tag |
 
 ## Getting Started
 

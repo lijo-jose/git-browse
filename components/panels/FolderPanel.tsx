@@ -447,6 +447,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
                         onMouseEnter={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
                         onMouseLeave={e => { if (selectedRepo !== s.path) (e.currentTarget as HTMLElement).style.background = ''; }}
                         onClick={() => onRepoSelect(s.path)}
+                        onContextMenu={ev => openCtxMenu(ev, { name: s.name, path: s.path, isDirectory: true, isGitRepo: true })}
                       >
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
                           <circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/><circle cx="11" cy="3.5" r="1.5"/>
@@ -573,6 +574,7 @@ export default function FolderPanel({ onRepoSelect, selectedRepo, navigateTo }: 
           onClick={e => e.stopPropagation()}
         >
           <CtxItem icon={<CopyIcon />} label="Copy Path" onClick={() => copyPath(ctxMenu.entry.path)} />
+          <CtxItem icon={<VSCodeIcon />} label="Open in VS Code" onClick={() => { window.location.href = `vscode://file${ctxMenu.entry.path}?windowId=_blank`; setCtxMenu(null); }} />
           <CtxDivider />
           {ctxMenu.entry.isDirectory && (
             <>
@@ -756,6 +758,14 @@ function XIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
       <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+    </svg>
+  );
+}
+
+function VSCodeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M11.5 1.5l-7 5.5-3-2.5L0 5.5v5l1.5 1 3-2.5 7 5.5 3-1.5V3L11.5 1.5zM13 11.5L7 7.5v-1l6-4v9z"/>
     </svg>
   );
 }
