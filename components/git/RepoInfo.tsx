@@ -39,6 +39,25 @@ export default function RepoInfo({ repo }: { repo: string }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+      {/* Insights link */}
+      <a
+        href={`/insights?repo=${encodeURIComponent(info.repoPath)}`}
+        className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-xs font-medium transition-colors group"
+        style={{ background: 'color-mix(in oklch, var(--bg-raised) 50%, transparent)', color: 'var(--text-soft)', border: '1px solid color-mix(in oklch, var(--border-subtle) 50%, transparent)' }}
+      >
+        <span className="flex items-center gap-2">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="9" width="3" height="6" rx="0.5"/>
+            <rect x="6" y="5" width="3" height="10" rx="0.5"/>
+            <rect x="11" y="1" width="3" height="14" rx="0.5"/>
+          </svg>
+          View detailed insights
+        </span>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 group-hover:opacity-100 transition-opacity">
+          <path d="M4 2l4 4-4 4"/>
+        </svg>
+      </a>
+
       {/* Repo name */}
       <Section label="Repository">
         <Row label="Name" value={repoName} mono />

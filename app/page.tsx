@@ -133,6 +133,21 @@ export default function Home() {
                       <span className="text-[10px] font-medium">Compare</span>
                     </button>
                   )}
+                  {/* Insights link */}
+                  {repo && (
+                    <a
+                      href={`/insights?repo=${encodeURIComponent(repo)}`}
+                      title="Repository insights"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="9" width="3" height="6" rx="0.5"/>
+                        <rect x="6" y="5" width="3" height="10" rx="0.5"/>
+                        <rect x="11" y="1" width="3" height="14" rx="0.5"/>
+                      </svg>
+                      <span className="text-[10px] font-medium">Insights</span>
+                    </a>
+                  )}
                   {/* Toggle diff panel */}
                   <button
                     onClick={() => setShowDiff(v => !v)}
