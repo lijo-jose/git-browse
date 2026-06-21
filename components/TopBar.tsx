@@ -6,6 +6,10 @@ import DirPicker from './ui/DirPicker';
 import { COMMAND_EVENT } from './CommandPalette';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
+import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
+
+const PUSH_OP: DangerOp = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
+const PULL_OP: DangerOp = { title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
 
 interface TopBarProps {
   repo: string | null;
@@ -15,6 +19,7 @@ interface TopBarProps {
 }
 
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
+  const { unlocked, lock, unlock, guard } = useDangerZone();
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -163,7 +168,13 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     return () => window.removeEventListener(COMMAND_EVENT, fn);
   }); // re-bound each render so run/openClone see fresh state
 
-  const run = async (action: 'fetch' | 'pull' | 'push') => {
+  const run = (action: 'fetch' | 'pull' | 'push') => {
+    if (!repo) return;
+    if (action === 'fetch') { executeRun('fetch'); return; }
+    guard(action === 'push' ? PUSH_OP : PULL_OP, () => executeRun(action));
+  };
+
+  const executeRun = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     setBusy(action);
     try {
@@ -195,8 +206,12 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     } finally { setBusy(null); loadSyncStatus(repo); }
   };
 
-  const pushWithUpstream = async () => {
+  const pushWithUpstream = () => {
     setUpstreamPrompt(false);
+    guard(PUSH_OP, executePushWithUpstream);
+  };
+
+  const executePushWithUpstream = async () => {
     if (!repo) return;
     setBusy('push');
     try {
@@ -425,9 +440,31 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           </div>
         )}
 
+        {/* Danger zone toggle */}
+        <button
+          onClick={() => unlocked ? lock() : unlock()}
+          title={unlocked ? 'Danger zone unlocked — click to lock remote operations' : 'Danger zone locked — remote operations require confirmation'}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors"
+          style={{ color: unlocked ? 'oklch(0.72 0.16 70)' : 'var(--text-dim)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 80%, transparent)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
+        >
+          {unlocked ? (
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="7" width="10" height="8" rx="1.5"/>
+              <path d="M5 7V4.5a3 3 0 015.83-1"/>
+            </svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="7" width="10" height="8" rx="1.5"/>
+              <path d="M5 7V5a3 3 0 016 0v2"/>
+            </svg>
+          )}
+        </button>
+
         {/* Sync split button: Pull is primary, Fetch/Push under the caret */}
         <div className="relative" ref={syncRef}>
-          <div className="flex items-center rounded-md border border-[var(--border-subtle)]/60">
+          <div className="flex items-center rounded-md border transition-colors" style={{ borderColor: !unlocked ? 'color-mix(in oklch, oklch(0.72 0.16 70) 35%, var(--border-subtle))' : 'color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
             <button
               disabled={!repo || busy !== null}
               onClick={() => run('pull')}

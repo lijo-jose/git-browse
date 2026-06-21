@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
+import { DangerZoneProvider } from "@/lib/dangerZone";
 import AppShell from "@/components/AppShell";
 
 const inter = Inter({
@@ -44,7 +45,9 @@ export default function RootLayout({
       </head>
       <body className="h-full flex flex-col">
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
+          <DangerZoneProvider>
+            <AppShell>{children}</AppShell>
+          </DangerZoneProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -30,6 +30,9 @@ export default function Home() {
   const [clonedRepo, setClonedRepo] = useState<string | null>(null);
   const [compareBase, setCompareBase] = useState<string | null>(null); // null = off, string = compare mode
 
+  const hasDiff = !!(selectedFile || selectedCommit);
+  const diffVisible = showDiff && hasDiff;
+
   const handleRepoSelect = (path: string) => {
     setRepo(path);
     setSelectedFile(undefined);
@@ -101,7 +104,7 @@ export default function Home() {
         ) : (
           <>
             {/* Middle — git panel */}
-            <section className={`flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] min-h-0 transition-all duration-200 ${showDiff ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
+            <section className={`flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] min-h-0 transition-all duration-200 ${diffVisible ? 'w-[320px] flex-shrink-0' : 'flex-1'}`}>
               <div className="h-9 flex items-center justify-between px-2 border-b border-[var(--border-subtle)]/60 flex-shrink-0 gap-1">
                 <div className="flex items-center gap-1">
                   {!showSidebar && (
@@ -173,7 +176,7 @@ export default function Home() {
             </section>
 
             {/* Right — diff (collapsible) */}
-            {showDiff && (
+            {diffVisible && (
               <section className="flex-1 flex flex-col min-h-0 min-w-0 bg-background">
                 <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-subtle)]/60 flex-shrink-0">
                   <span className="text-[10px] font-semibold tracking-widest text-[var(--text-dim)] uppercase">Diff</span>

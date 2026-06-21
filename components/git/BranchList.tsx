@@ -7,11 +7,16 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import InteractiveRebaseDialog from './InteractiveRebaseDialog';
 import { COMMAND_EVENT } from '@/components/CommandPalette';
+import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
+
+const TAG_OP: DangerOp = { title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
+const REBASE_OP: DangerOp = { title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
 
 interface Branch { name: string; current: boolean; remote: boolean; lastCommit?: string; lastCommitDate?: string; }
 type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string };
 
 export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: string; onBranchSwitch?: () => void; onCompare?: (branch: string) => void }) {
+  const { guard } = useDangerZone();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,24 +55,26 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       .catch(() => setDivergence({}));
   };
 
-  const doTag = async () => {
+  const doTag = () => {
     const t = tagName.trim();
     if (!t) return;
-    setTagging(true);
-    try {
-      const res = await fetch('/api/git/tag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, tag: t }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
-      toast.success('Tag created & pushed', { description: d.result || t });
-      setTagDialogOpen(false);
-      setTagName('');
-      load();
-    } catch (e) { toast.error('Tag failed', { description: String(e) }); }
-    finally { setTagging(false); }
+    guard(TAG_OP, async () => {
+      setTagging(true);
+      try {
+        const res = await fetch('/api/git/tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo, tag: t }),
+        });
+        const d = await res.json();
+        if (d.error) throw new Error(d.error);
+        toast.success('Tag created & pushed', { description: d.result || t });
+        setTagDialogOpen(false);
+        setTagName('');
+        load();
+      } catch (e) { toast.error('Tag failed', { description: String(e) }); }
+      finally { setTagging(false); }
+    });
   };
 
   useEffect(() => { load(); }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -87,7 +94,16 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     return () => window.removeEventListener(COMMAND_EVENT, fn);
   }, []);
 
-  const doAction = async () => {
+  const doAction = () => {
+    if (!action) return;
+    if (action.type === 'rebase') {
+      guard(REBASE_OP, executeAction);
+    } else {
+      executeAction();
+    }
+  };
+
+  const executeAction = async () => {
     if (!action) return;
     setBusy(true);
     try {
@@ -153,23 +169,25 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     finally { setCreating(false); }
   };
 
-  const doRebase = async () => {
+  const doRebase = () => {
     if (!rebaseBranch.trim()) return;
-    setRebasing(true);
-    try {
-      const res = await fetch('/api/git/rebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, branch: rebaseBranch.trim() }),
-      });
-      const d = await res.json();
-      if (d.error) throw new Error(d.error);
-      toast.success(d.result || `Rebased onto ${rebaseBranch.trim()}`);
-      setRebaseOpen(false);
-      setRebaseBranch('');
-      onBranchSwitch?.();
-    } catch (e) { toast.error('Rebase failed', { description: String(e) }); }
-    finally { setRebasing(false); }
+    guard(REBASE_OP, async () => {
+      setRebasing(true);
+      try {
+        const res = await fetch('/api/git/rebase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo, branch: rebaseBranch.trim() }),
+        });
+        const d = await res.json();
+        if (d.error) throw new Error(d.error);
+        toast.success(d.result || `Rebased onto ${rebaseBranch.trim()}`);
+        setRebaseOpen(false);
+        setRebaseBranch('');
+        onBranchSwitch?.();
+      } catch (e) { toast.error('Rebase failed', { description: String(e) }); }
+      finally { setRebasing(false); }
+    });
   };
 
   if (loading) return (

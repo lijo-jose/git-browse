@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useDangerZone } from '@/lib/dangerZone';
+
+const PUSH_OP = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 
 interface FileCtxMenu { x: number; y: number; fullPath: string; }
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +26,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
+  const { guard } = useDangerZone();
   const [files, setFiles] = useState<GitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -238,7 +242,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
             </button>
           )}
           <button
-            onClick={() => setPushOpen(true)}
+            onClick={() => guard(PUSH_OP, () => setPushOpen(true))}
             className="h-7 px-3 rounded-md text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
           >
             Push…

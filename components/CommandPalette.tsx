@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme, THEMES, type ThemeId } from '@/lib/theme';
+import { useDangerZone } from '@/lib/dangerZone';
+
+const DANGEROUS_IDS = new Set(['sync:push', 'sync:pull', 'sync:fetch', 'tag:new']);
 
 export const COMMAND_EVENT = 'gitbrowse:command';
 
@@ -22,6 +25,7 @@ export default function CommandPalette() {
   const router = useRouter();
   const pathname = usePathname();
   const { setTheme } = useTheme();
+  const { unlocked } = useDangerZone();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
@@ -188,9 +192,18 @@ export default function CommandPalette() {
                     }}
                   >
                     <span className="font-medium truncate flex-1">{cmd.title}</span>
-                    {cmd.hint && (
-                      <span className="text-[10px] font-mono flex-shrink-0 truncate max-w-[220px]" style={{ color: 'var(--text-dim)' }}>{cmd.hint}</span>
-                    )}
+                    <span className="flex items-center gap-1.5 flex-shrink-0">
+                      {!unlocked && DANGEROUS_IDS.has(cmd.id) && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-mono" style={{ color: 'oklch(0.72 0.16 70)' }}>
+                          <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/>
+                          </svg>
+                        </span>
+                      )}
+                      {cmd.hint && (
+                        <span className="text-[10px] font-mono truncate max-w-[220px]" style={{ color: 'var(--text-dim)' }}>{cmd.hint}</span>
+                      )}
+                    </span>
                   </button>
                 );
               })}
