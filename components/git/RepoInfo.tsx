@@ -11,18 +11,31 @@ interface RepoInfo {
   totalCommits: number;
   repoPath: string;
 }
+interface GitIdentity {
+  name: string;
+  email: string;
+  nameScope: 'local' | 'global' | 'unset';
+  emailScope: 'local' | 'global' | 'unset';
+}
 
 export default function RepoInfo({ repo }: { repo: string }) {
   const [info, setInfo] = useState<RepoInfo | null>(null);
+  const [identity, setIdentity] = useState<GitIdentity | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!repo) return;
     setLoading(true); setError('');
-    fetch(`/api/git/info?repo=${encodeURIComponent(repo)}`)
-      .then(r => r.json())
-      .then(d => { if (d.error) setError(d.error); else setInfo(d); })
+    Promise.all([
+      fetch(`/api/git/info?repo=${encodeURIComponent(repo)}`).then(r => r.json()),
+      fetch(`/api/git/config?repo=${encodeURIComponent(repo)}`).then(r => r.json()),
+    ])
+      .then(([infoData, identityData]) => {
+        if (infoData.error) setError(infoData.error);
+        else setInfo(infoData);
+        if (!identityData.error) setIdentity(identityData);
+      })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   }, [repo]);
@@ -71,7 +84,15 @@ export default function RepoInfo({ repo }: { repo: string }) {
         <Row label="Commits" value={String(info.totalCommits)} />
       </Section>
 
-      {/* Remotes */}
+      {/* Git identity (read-only) */}
+      {identity && (
+        <Section label="Git identity">
+          <IdentityRow label="Name" value={identity.name} scope={identity.nameScope} />
+          <IdentityRow label="Email" value={identity.email} scope={identity.emailScope} />
+        </Section>
+      )}
+
+      {/* Remotes (read-only) */}
       <Section label={`Remotes (${info.remotes.length})`}>
         {info.remotes.length === 0 ? (
           <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-dim)' }}>No remotes configured</p>
@@ -90,6 +111,21 @@ export default function RepoInfo({ repo }: { repo: string }) {
           </div>
         ))}
       </Section>
+    </div>
+  );
+}
+
+function IdentityRow({ label, value, scope }: { label: string; value: string; scope: 'local' | 'global' | 'unset' }) {
+  const scopeColor = scope === 'local' ? 'oklch(0.74 0.17 150)' : scope === 'global' ? 'oklch(0.65 0.18 250)' : 'var(--text-dim)';
+  return (
+    <div className="flex items-center px-3 py-2" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 40%, transparent)' }}>
+      <span className="text-[10px] w-12 flex-shrink-0 font-medium" style={{ color: 'var(--text-dim)' }}>{label}</span>
+      <span className="text-xs font-mono truncate flex-1" style={{ color: value ? 'var(--foreground)' : 'var(--text-dim)' }}>{value || '—'}</span>
+      {scope !== 'unset' && (
+        <span className="text-[9px] px-1.5 py-0.5 rounded-full ml-1 flex-shrink-0 font-medium" style={{ background: `color-mix(in oklch, ${scopeColor} 15%, transparent)`, color: scopeColor }}>
+          {scope}
+        </span>
+      )}
     </div>
   );
 }

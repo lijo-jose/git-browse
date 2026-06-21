@@ -561,3 +561,61 @@ export async function cloneRepo(remote: string, directory: string, name?: string
   await git.clone(remote, cloneDir);
   return cloneDir;
 }
+
+// ── Git config ────────────────────────────────────────────────────────────────
+
+export interface GitIdentity {
+  name: string;
+  email: string;
+  nameScope: 'local' | 'global' | 'unset';
+  emailScope: 'local' | 'global' | 'unset';
+}
+
+function readConfigValue(repoPath: string, key: string): { value: string; scope: 'local' | 'global' | 'unset' } {
+  try {
+    const local = execSync(`git config --local ${key}`, { cwd: repoPath, encoding: 'utf8' }).trim();
+    if (local) return { value: local, scope: 'local' };
+  } catch { /* not set locally */ }
+  try {
+    const global = execSync(`git config --global ${key}`, { encoding: 'utf8' }).trim();
+    if (global) return { value: global, scope: 'global' };
+  } catch { /* not set globally */ }
+  return { value: '', scope: 'unset' };
+}
+
+export function getGitIdentity(repoPath: string): GitIdentity {
+  const name = readConfigValue(repoPath, 'user.name');
+  const email = readConfigValue(repoPath, 'user.email');
+  return {
+    name: name.value,
+    email: email.value,
+    nameScope: name.scope,
+    emailScope: email.scope,
+  };
+}
+
+export function setGitIdentity(repoPath: string, key: 'user.name' | 'user.email', value: string, scope: 'local' | 'global'): void {
+  const scopeFlag = scope === 'global' ? '--global' : '--local';
+  if (value.trim() === '') {
+    try {
+      execSync(`git config ${scopeFlag} --unset ${key}`, { cwd: repoPath, encoding: 'utf8' });
+    } catch { /* already unset is fine */ }
+  } else {
+    execSync(`git config ${scopeFlag} ${key} ${JSON.stringify(value)}`, { cwd: repoPath, encoding: 'utf8' });
+  }
+}
+
+// ── Remote management ─────────────────────────────────────────────────────────
+
+export function addRemote(repoPath: string, name: string, url: string): void {
+  execSync(`git remote add ${JSON.stringify(name)} ${JSON.stringify(url)}`, { cwd: repoPath, encoding: 'utf8' });
+}
+
+export function removeRemote(repoPath: string, name: string): void {
+  execSync(`git remote remove ${JSON.stringify(name)}`, { cwd: repoPath, encoding: 'utf8' });
+}
+
+export function setRemoteUrl(repoPath: string, name: string, url: string, pushUrl = false): void {
+  const flag = pushUrl ? '--push' : '';
+  execSync(`git remote set-url ${flag} ${JSON.stringify(name)} ${JSON.stringify(url)}`.trim(), { cwd: repoPath, encoding: 'utf8' });
+}

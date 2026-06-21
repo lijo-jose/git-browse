@@ -30,6 +30,9 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const [files, setFiles] = useState<GitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [extFilter, setExtFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [staging, setStaging] = useState(false);
   const [discarding, setDiscarding] = useState(false);
@@ -166,22 +169,116 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   );
   if (error) return <p className="p-4 text-rose-500 text-xs">{error}</p>;
 
-  const staged = files.filter(f => f.staged);
-  const unstaged = files.filter(f => !f.staged);
+  const getExt = (path: string) => {
+    const name = path.split('/').pop() || '';
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(dot) : '';
+  };
+
+  const applyFilter = (list: GitFile[]) => list.filter(f => {
+    const matchesQuery = !filterQuery || f.path.toLowerCase().includes(filterQuery.toLowerCase());
+    const matchesStatus = !statusFilter || f.status[0] === statusFilter;
+    const matchesExt = !extFilter || getExt(f.path) === extFilter;
+    return matchesQuery && matchesStatus && matchesExt;
+  });
+
+  const staged = applyFilter(files.filter(f => f.staged));
+  const unstaged = applyFilter(files.filter(f => !f.staged));
   const hasFiles = files.length > 0;
   const allKeys = files.map(f => f.path);
   const allSelected = allKeys.length > 0 && allKeys.every(k => selected.has(k));
   const someSelected = allKeys.some(k => selected.has(k)) && !allSelected;
+
+  const presentStatuses = [...new Set(files.map(f => f.status[0]))].filter(Boolean);
+  const presentExts = [...new Set(files.map(f => getExt(f.path)))].filter(Boolean).sort();
 
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
     else setSelected(new Set(allKeys));
   };
 
+  const STATUS_LABELS: Record<string, string> = { M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', U: 'Unmerged', '?': 'Untracked' };
+
   return (
     <div className="flex flex-col h-full min-h-0">
+      {hasFiles && (
+        <div className="flex-shrink-0 px-3 pt-2 pb-1 flex flex-col gap-1.5" style={{ borderBottom: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-40" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6.5" cy="6.5" r="5"/><path d="M11 11l3 3"/>
+            </svg>
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value)}
+              placeholder="Filter files…"
+              className="w-full pl-7 pr-6 py-1 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60"
+              style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}
+            />
+            {filterQuery && (
+              <button
+                onClick={() => setFilterQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--foreground)' }}
+              >
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M2 2l12 12M14 2L2 14"/></svg>
+              </button>
+            )}
+          </div>
+          {(presentStatuses.length > 1 || presentExts.length > 0) && (
+            <div className="flex gap-1 flex-wrap items-center">
+              {presentStatuses.length > 1 && presentStatuses.map(s => {
+                const col = STATUS_COLORS[s] || STATUS_COLORS['M'];
+                const active = statusFilter === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(active ? null : s)}
+                    className={`h-5 px-2 rounded text-[10px] font-bold ring-1 ring-inset transition-opacity ${col.bg} ${col.fg}`}
+                    style={{ opacity: statusFilter && !active ? 0.35 : 1 }}
+                    title={STATUS_LABELS[s] || s}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+              {presentStatuses.length > 1 && presentExts.length > 0 && (
+                <span className="w-px h-3 mx-0.5 rounded-full" style={{ background: 'var(--border-subtle)' }} />
+              )}
+              {presentExts.map(ext => {
+                const active = extFilter === ext;
+                return (
+                  <button
+                    key={ext}
+                    onClick={() => setExtFilter(active ? null : ext)}
+                    className="h-5 px-2 rounded text-[10px] font-medium ring-1 ring-inset transition-opacity"
+                    style={{
+                      background: active ? 'color-mix(in oklch, var(--primary) 15%, transparent)' : 'var(--bg-raised)',
+                      color: active ? 'var(--primary)' : 'var(--text-dim)',
+                      ringColor: active ? 'color-mix(in oklch, var(--primary) 30%, transparent)' : 'var(--border-subtle)',
+                      opacity: extFilter && !active ? 0.4 : 1,
+                    }}
+                  >
+                    {ext}
+                  </button>
+                );
+              })}
+              {(statusFilter || extFilter) && (
+                <button
+                  onClick={() => { setStatusFilter(null); setExtFilter(null); }}
+                  className="h-5 px-2 rounded text-[10px] font-medium transition-opacity"
+                  style={{ color: 'var(--text-dim)', background: 'var(--bg-raised)' }}
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
         {!hasFiles && <Empty label="Working tree clean" />}
+        {hasFiles && staged.length === 0 && unstaged.length === 0 && <Empty label="No matching files" />}
         {staged.length > 0 && (
           <Section label="Staged" files={staged} repo={repo} selected={selected} selectedFile={selectedFile}
             onFileSelect={onFileSelect} onToggle={toggleSelect}

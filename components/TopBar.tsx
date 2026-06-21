@@ -7,6 +7,7 @@ import { COMMAND_EVENT } from './CommandPalette';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
+import RepoSettingsModal from './git/RepoSettingsModal';
 
 const PUSH_OP: DangerOp = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 const PULL_OP: DangerOp = { title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
@@ -38,6 +39,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [cloneProgress, setCloneProgress] = useState<string | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
   const [upstreamPrompt, setUpstreamPrompt] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [sync, setSync] = useState<{ ahead: number; behind: number; tracking: string | null } | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
 
@@ -323,6 +325,18 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         </svg>
       </button>
 
+      <button
+        onClick={() => repo && setSettingsOpen(true)}
+        disabled={!repo}
+        title="Repository settings"
+        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-dim)] hover:text-foreground hover:bg-[var(--bg-raised)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="8" cy="8" r="2.2"/>
+          <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"/>
+        </svg>
+      </button>
+
       <div className="w-px h-4 bg-[var(--border-subtle)]" />
 
       {/* Actions */}
@@ -530,6 +544,10 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {settingsOpen && repo && (
+      <RepoSettingsModal repo={repo} onClose={() => setSettingsOpen(false)} />
+    )}
 
     {cloneProgress && (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
