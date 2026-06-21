@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDangerZone } from '@/lib/dangerZone';
+import { useActivity } from '@/lib/activity';
 
 const PUSH_OP = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 
@@ -27,6 +28,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 
 export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const { guard } = useDangerZone();
+  const { start: startActivity } = useActivity();
   const [files, setFiles] = useState<GitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -100,6 +102,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const doCommit = async () => {
     if (!commitMsg.trim()) { msgRef.current?.focus(); return; }
     setCommitting(true);
+    const stopActivity = startActivity('commit', 'Committing…');
     try {
       const res = await fetch('/api/git/commit', {
         method: 'POST',
@@ -115,7 +118,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
       load();
     } catch (e) {
       toast.error('Commit failed', { description: String(e) });
-    } finally { setCommitting(false); }
+    } finally { setCommitting(false); stopActivity(); }
   };
 
   const doDiscard = async (all: boolean) => {
@@ -144,6 +147,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
 
   const doPush = async () => {
     setPushing(true);
+    const stopActivity = startActivity('push', 'Pushing…');
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
@@ -157,7 +161,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
       setPushSetUpstream(false);
     } catch (e) {
       toast.error('Push failed', { description: String(e) });
-    } finally { setPushing(false); }
+    } finally { setPushing(false); stopActivity(); }
   };
 
   if (loading) return (

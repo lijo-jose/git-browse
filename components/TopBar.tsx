@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from './ui/button';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import RepoSettingsModal from './git/RepoSettingsModal';
+import { useActivity } from '@/lib/activity';
 
 const PUSH_OP: DangerOp = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 const PULL_OP: DangerOp = { title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
@@ -21,6 +22,7 @@ interface TopBarProps {
 
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const { unlocked, lock, unlock, guard } = useDangerZone();
+  const { activities, start: startActivity } = useActivity();
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -179,6 +181,8 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const executeRun = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     setBusy(action);
+    const labels: Record<string, string> = { fetch: 'Fetching…', pull: 'Pulling…', push: 'Pushing…' };
+    const stopActivity = startActivity(action, labels[action]);
     try {
       if (action === 'push') {
         const res = await fetch('/api/git/push', {
@@ -191,6 +195,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           const noUpstream = /no upstream|set.upstream|has no upstream/i.test(data.error);
           if (noUpstream && branch) {
             setBusy(null);
+            stopActivity();
             setUpstreamPrompt(true);
             return;
           }
@@ -205,7 +210,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       }
     } catch (e) {
       toast.error(`${action} failed`, { description: String(e) });
-    } finally { setBusy(null); loadSyncStatus(repo); }
+    } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
   const pushWithUpstream = () => {
@@ -216,6 +221,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const executePushWithUpstream = async () => {
     if (!repo) return;
     setBusy('push');
+    const stopActivity = startActivity('push', 'Pushing…');
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
@@ -227,7 +233,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       toast.success('Pushed', { description: data.result || 'Done' });
     } catch (e) {
       toast.error('push failed', { description: String(e) });
-    } finally { setBusy(null); loadSyncStatus(repo); }
+    } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
   return (
@@ -269,6 +275,20 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           <span className="text-sm text-[var(--text-dim)]">No repository selected</span>
         )}
       </div>
+
+      {/* Activity indicator */}
+      {activities.length > 0 && (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'color-mix(in oklch, var(--bg-raised) 80%, transparent)', border: '1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent)' }}>
+          <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: 'oklch(0.65 0.18 250)' }} />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: 'oklch(0.65 0.18 250)' }} />
+          </span>
+          <span className="text-[11px] font-medium" style={{ color: 'var(--text-soft)' }}>
+            {activities[activities.length - 1].label}
+            {activities.length > 1 && <span className="ml-1 opacity-60">+{activities.length - 1}</span>}
+          </span>
+        </div>
+      )}
 
       {/* Open repo: recent + clone */}
       <div className="relative" ref={ref}>

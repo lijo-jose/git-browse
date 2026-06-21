@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import InteractiveRebaseDialog from './InteractiveRebaseDialog';
 import { COMMAND_EVENT } from '@/components/CommandPalette';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
+import { useActivity } from '@/lib/activity';
 
 const TAG_OP: DangerOp = { title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
 const REBASE_OP: DangerOp = { title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
@@ -17,6 +18,7 @@ type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string
 
 export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: string; onBranchSwitch?: () => void; onCompare?: (branch: string) => void }) {
   const { guard } = useDangerZone();
+  const { start: startActivity } = useActivity();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,6 +62,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     if (!t) return;
     guard(TAG_OP, async () => {
       setTagging(true);
+      const stopActivity = startActivity('tag', 'Creating tag…');
       try {
         const res = await fetch('/api/git/tag', {
           method: 'POST',
@@ -73,7 +76,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         setTagName('');
         load();
       } catch (e) { toast.error('Tag failed', { description: String(e) }); }
-      finally { setTagging(false); }
+      finally { setTagging(false); stopActivity(); }
     });
   };
 
@@ -106,6 +109,8 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   const executeAction = async () => {
     if (!action) return;
     setBusy(true);
+    const actionLabels: Record<string, string> = { checkout: 'Switching branch…', merge: 'Merging…', rebase: 'Rebasing…', delete: 'Deleting branch…' };
+    const stopActivity = startActivity('branch-op', actionLabels[action.type] ?? 'Working…');
     try {
       if (action.type === 'checkout') {
         const res = await fetch(`/api/git/checkout?repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(action.branch)}`, { method: 'POST' });
@@ -146,7 +151,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         load();
       }
     } catch (e) { toast.error(`${action.type} failed`, { description: String(e) }); }
-    finally { setBusy(false); setAction(null); }
+    finally { setBusy(false); stopActivity(); setAction(null); }
   };
 
   const doCreate = async () => {
