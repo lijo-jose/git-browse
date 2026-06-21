@@ -255,11 +255,12 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
                   <button
                     key={ext}
                     onClick={() => setExtFilter(active ? null : ext)}
-                    className="h-5 px-2 rounded text-[10px] font-medium ring-1 ring-inset transition-opacity"
+                    className="h-5 px-2 rounded text-[10px] font-medium transition-opacity"
                     style={{
                       background: active ? 'color-mix(in oklch, var(--primary) 15%, transparent)' : 'var(--bg-raised)',
                       color: active ? 'var(--primary)' : 'var(--text-dim)',
-                      ringColor: active ? 'color-mix(in oklch, var(--primary) 30%, transparent)' : 'var(--border-subtle)',
+                      outline: `1px solid ${active ? 'color-mix(in oklch, var(--primary) 30%, transparent)' : 'var(--border-subtle)'}`,
+                      outlineOffset: '-1px',
                       opacity: extFilter && !active ? 0.4 : 1,
                     }}
                   >

@@ -232,3 +232,24 @@
 .diff-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--primary) 60%, var(--scrollbar-hover)); border: 2px solid transparent; background-clip: padding-box; }
 .diff-scroll::-webkit-scrollbar-corner { background: transparent; }
 .diff-scroll { scrollbar-width: auto; scrollbar-color: var(--scrollbar-hover) color-mix(in oklch, var(--border-subtle) 40%, transparent); }
+
+/* ── Docs prose ── */
+.prose { color: var(--text-soft); line-height: 1.75; }
+.prose h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 1rem; color: var(--text-default, var(--foreground)); }
+.prose h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 0.75rem; color: var(--text-default, var(--foreground)); border-bottom: 1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent); padding-bottom: 0.35rem; }
+.prose h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--text-default, var(--foreground)); }
+.prose p { margin: 0 0 1rem; }
+.prose ul, .prose ol { margin: 0 0 1rem 1.5rem; }
+.prose li { margin-bottom: 0.35rem; }
+.prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.prose a:hover { opacity: 0.8; }
+.prose code { font-size: 0.85em; background: color-mix(in oklch, var(--border-subtle) 50%, transparent); border-radius: 4px; padding: 0.15em 0.4em; font-family: ui-monospace, monospace; }
+.prose pre { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem 1.25rem; overflow-x: auto; margin: 0 0 1.25rem; }
+.prose pre code { background: none; padding: 0; font-size: 0.875rem; }
+.prose blockquote { border-left: 3px solid var(--primary); margin: 0 0 1rem; padding: 0.5rem 0 0.5rem 1rem; color: var(--text-dim); }
+.prose hr { border: none; border-top: 1px solid color-mix(in oklch, var(--border-subtle) 60%, transparent); margin: 2rem 0; }
+.prose img { max-width: 100%; border-radius: 8px; margin: 1rem 0; border: 1px solid var(--border-subtle); }
+.prose table { width: 100%; border-collapse: collapse; margin: 0 0 1.25rem; font-size: 0.9rem; }
+.prose th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle); color: var(--text-default, var(--foreground)); font-weight: 600; }
+.prose td { padding: 0.5rem 0.75rem; border-bottom: 1px solid color-mix(in oklch, var(--border-subtle) 40%, transparent); }
+.prose tr:last-child td { border-bottom: none; }
