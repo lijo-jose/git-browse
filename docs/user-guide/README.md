@@ -2,7 +2,7 @@
 
 **Git Browse** is a local git repository browser that runs in your browser. No accounts, no cloud — point it at any folder on your machine and get a fast, keyboard-friendly UI over your repos.
 
-![Git Browse](../../images/Screenshot%202026-06-21%20at%209.14.21%20AM.png)
+![Git Browse](../../images/screenshot-2026-06-21-at-9.14.21-am.png)
 
 ---
 
