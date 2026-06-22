@@ -2,7 +2,7 @@
 
 The Log tab shows the commit graph for the current repository.
 
-![Commit graph](../medium/images/01-main-three-panel.png)
+![Commit graph](../../public/doc-images/01-main-three-panel.png)
 
 ---
 

@@ -2,7 +2,7 @@
 
 The Explorer is the left panel. It lets you browse your filesystem, pin repositories, and organise them into groups.
 
-![Explorer with groups](../../images/screenshot-2026-06-21-at-9.14.21-am.png)
+![Explorer with groups](../../public/doc-images/screenshot-2026-06-21-at-9.14.21-am.png)
 
 ---
 

@@ -8,7 +8,7 @@ Repository Settings lets you manage git identity, remotes, and security options 
 
 ## Git Identity
 
-![Repository Settings — Git Identity](../../images/screenshot-2026-06-21-at-9.15.40-am.png)
+![Repository Settings — Git Identity](../../public/doc-images/screenshot-2026-06-21-at-9.15.40-am.png)
 
 View and update the `user.name` and `user.email` used for commits.
 
@@ -37,7 +37,7 @@ Each remote shows its fetch and push URLs. Actions available:
 
 ## Security — Danger Zone
 
-![Repository Settings — Security](../../images/screenshot-2026-06-21-at-9.18.22-am.png)
+![Repository Settings — Security](../../public/doc-images/screenshot-2026-06-21-at-9.18.22-am.png)
 
 The danger zone controls whether remote operations require a confirmation dialog.
 

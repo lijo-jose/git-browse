@@ -2,7 +2,7 @@
 
 The Insights page shows analytics for the current repository, built entirely from local git data — no external services.
 
-![Insights page](../../images/screenshot-2026-06-21-at-9.18.38-am.png)
+![Insights page](../../public/doc-images/screenshot-2026-06-21-at-9.18.38-am.png)
 
 **To open:** Go to the **Info** tab in the Repository panel → click **View detailed insights →**
 

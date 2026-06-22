@@ -2,7 +2,7 @@
 
 The Branches tab lists all local and remote branches, lets you manage them, and shows tags. The Stash tab manages your stash entries.
 
-![Branches tab](../medium/images/03-branches-divergence.png)
+![Branches tab](../../public/doc-images/03-branches-divergence.png)
 
 ---
 
@@ -58,7 +58,7 @@ Tags are listed below branches in the Branches tab, with their date and commit s
 2. Enter a tag name (e.g. `v1.2.0`) and optional message
 3. Click **Create & push** to tag HEAD and push the tag to origin in one step
 
-![New tag dialog](../medium/images/04-new-tag-dialog.png)
+![New tag dialog](../../public/doc-images/04-new-tag-dialog.png)
 
 ---
 

@@ -2,7 +2,7 @@
 
 The Changes tab shows your working tree — modified, added, and deleted files — and lets you stage, commit, and push.
 
-![Changes tab](../medium/images/05-changes-tab.png)
+![Changes tab](../../public/doc-images/05-changes-tab.png)
 
 ---
 

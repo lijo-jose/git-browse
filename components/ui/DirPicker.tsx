@@ -15,16 +15,25 @@ export default function DirPicker({ value, onChange, onClose }: Props) {
   const [resolved, setResolved] = useState('');
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<{ message: string; isPermission: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (p: string) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/fs?path=${encodeURIComponent(p)}`);
       const d = await res.json();
-      // filter to directories only
+      if (!res.ok || d.error) {
+        setError({ message: d.error || 'Failed to read directory', isPermission: d.code === 'EPERM' });
+        setEntries([]);
+        return;
+      }
       setEntries((d.entries || []).filter((e: FsEntry) => e.isDirectory));
       setResolved(d.path || p);
+    } catch {
+      setError({ message: 'Failed to reach server', isPermission: false });
+      setEntries([]);
     } finally { setLoading(false); }
   }, []);
 
@@ -61,6 +70,20 @@ export default function DirPicker({ value, onChange, onClose }: Props) {
       <div className="flex-1 overflow-y-auto py-1">
         {loading ? (
           <div className="px-3 py-2 text-xs text-[var(--text-dim)]">Loading…</div>
+        ) : error ? (
+          <div className="px-3 py-3 flex flex-col gap-1">
+            {error.isPermission ? (
+              <>
+                <p className="text-xs font-medium" style={{ color: 'var(--color-warning, #f59e0b)' }}>Permission denied</p>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  macOS blocked access to this folder. Grant <strong>Full Disk Access</strong> to your terminal in{' '}
+                  <strong>System Settings → Privacy &amp; Security → Full Disk Access</strong>, then restart the server.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--text-dim)' }}>{error.message}</p>
+            )}
+          </div>
         ) : entries.length === 0 ? (
           <div className="px-3 py-2 text-xs text-[var(--text-dim)]">No subdirectories</div>
         ) : (

@@ -8,7 +8,7 @@ Git Browse has three comparison tools, each accessible from the activity rail on
 
 Compare any two refs — branches, tags, or commit SHAs.
 
-![Git Compare](../medium/images/06-git-compare.png)
+![Git Compare](../../public/doc-images/06-git-compare.png)
 
 **To use:**
 1. Click the **Git Compare** icon in the activity rail (branch icon)
@@ -25,7 +25,7 @@ Compare any two refs — branches, tags, or commit SHAs.
 
 Compare two directories on disk — whether they're git repos or not.
 
-![Folder Compare](../medium/images/07-folder-compare.png)
+![Folder Compare](../../public/doc-images/07-folder-compare.png)
 
 **To use:**
 1. Click the **Compare** icon in the activity rail (overlapping squares)

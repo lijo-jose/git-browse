@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
     const entries = listDirectory(safe);
     return NextResponse.json({ path: safe, entries });
   } catch (err: unknown) {
-    return NextResponse.json({ error: String(err) }, { status: 400 });
+    const isPermission = err instanceof Error && (err as NodeJS.ErrnoException).code === 'EPERM' ||
+                         err instanceof Error && (err as NodeJS.ErrnoException).code === 'EACCES';
+    return NextResponse.json({ error: String(err), code: isPermission ? 'EPERM' : 'ERR' }, { status: 400 });
   }
 }

@@ -16,6 +16,7 @@ export async function readDocFile(slug: string): Promise<string> {
 export async function parseMarkdown(content: string): Promise<string> {
   // Rewrite relative image paths to point to the correct public URL
   const rewritten = content
+    .replace(/\(\.\.\/\.\.\/public\/doc-images\//g, '(/doc-images/')
     .replace(/\(\.\.\/\.\.\/images\//g, '(/doc-images/')
     .replace(/\(\.\.\/medium\/images\//g, '(/doc-images/')
     .replace(/\(\.\.\/images\//g, '(/doc-images/');

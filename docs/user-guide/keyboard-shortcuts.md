@@ -2,7 +2,7 @@
 
 Press `⌘K` (Mac) or `Ctrl+K` (Windows/Linux) anywhere to open the **command palette** — a searchable list of every action with its shortcut displayed inline.
 
-![Command palette](../medium/images/02-command-palette.png)
+![Command palette](../../public/doc-images/02-command-palette.png)
 
 ---
 

@@ -2,7 +2,7 @@
 
 The Search page wraps grep and find with a simple UI. Click the **Search** icon (magnifying glass) in the activity rail.
 
-![Search](../medium/images/08-search-grep.png)
+![Search](../../public/doc-images/08-search-grep.png)
 
 ---
 
