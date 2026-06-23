@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useDangerZone } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
 
-const PUSH_OP = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
+const PUSH_OP = { id: 'push' as const, title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 
 interface FileCtxMenu { x: number; y: number; fullPath: string; }
 import { Skeleton } from '@/components/ui/skeleton';

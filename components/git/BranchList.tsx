@@ -10,8 +10,8 @@ import { COMMAND_EVENT } from '@/components/CommandPalette';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
 
-const TAG_OP: DangerOp = { title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
-const REBASE_OP: DangerOp = { title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
+const TAG_OP: DangerOp = { id: 'tag', title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
+const REBASE_OP: DangerOp = { id: 'rebase', title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
 
 interface Branch { name: string; current: boolean; remote: boolean; lastCommit?: string; lastCommitDate?: string; }
 type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string };

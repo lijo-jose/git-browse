@@ -10,8 +10,8 @@ import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import RepoSettingsModal from './git/RepoSettingsModal';
 import { useActivity } from '@/lib/activity';
 
-const PUSH_OP: DangerOp = { title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
-const PULL_OP: DangerOp = { title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
+const PUSH_OP: DangerOp = { id: 'push', title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
+const PULL_OP: DangerOp = { id: 'pull', title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
 
 interface TopBarProps {
   repo: string | null;
