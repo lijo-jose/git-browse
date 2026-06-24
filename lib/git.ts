@@ -142,6 +142,28 @@ export async function getDiff(
   return git.diff();
 }
 
+export async function getPatch(repoPath: string, files?: string[]): Promise<string> {
+  const git = getGit(repoPath);
+  const hasCommits = (() => {
+    try { execSync('git rev-parse HEAD', { cwd: repoPath, stdio: 'ignore' }); return true; }
+    catch { return false; }
+  })();
+  const base = hasCommits ? ['HEAD'] : ['--cached'];
+  const args = files && files.length > 0 ? [...base, '--', ...files] : base;
+  return git.diff(args);
+}
+
+export async function applyPatch(repoPath: string, patchContent: string): Promise<string> {
+  const tmpFile = join(tmpdir(), `git-tree-patch-${Date.now()}.patch`);
+  writeFileSync(tmpFile, patchContent, 'utf8');
+  try {
+    execSync(`git apply ${JSON.stringify(tmpFile)}`, { cwd: repoPath, encoding: 'utf8' });
+    return 'Patch applied successfully';
+  } finally {
+    try { rmSync(tmpFile); } catch { /* ignore */ }
+  }
+}
+
 // ── Branch/commit compare ─────────────────────────────────────────────────────
 
 export interface CompareFile { path: string; status: string; insertions: number; deletions: number; }

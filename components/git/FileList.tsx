@@ -6,10 +6,26 @@ import { useDangerZone } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
 import { useOperationLog } from '@/lib/operationLog';
 import { gitErrorToast } from '@/lib/gitErrorToast';
+import HintCallout from '@/components/HintCallout';
+import { useHint } from '@/lib/hints';
+
+async function downloadPatch(repo: string, files?: string[], filename = 'changes.patch') {
+  const params = new URLSearchParams({ repo });
+  if (files) files.forEach(f => params.append('file', f));
+  const res = await fetch(`/api/git/patch?${params}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  if (!data.patch) { toast.info('No changes to export'); return; }
+  const blob = new Blob([data.patch], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 const PUSH_OP = { id: 'push' as const, title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 
-interface FileCtxMenu { x: number; y: number; fullPath: string; }
+interface FileCtxMenu { x: number; y: number; fullPath: string; filePath: string; repo: string; }
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -32,6 +48,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const { guard } = useDangerZone();
   const { start: startActivity } = useActivity();
   const { logOp } = useOperationLog();
+  const ctxMenuHint = useHint('file-context-menu');
   const [files, setFiles] = useState<GitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,7 +67,38 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const [pushing, setPushing] = useState(false);
   const [pushSetUpstream, setPushSetUpstream] = useState(false);
   const [pushBranchName, setPushBranchName] = useState('');
+  const [patchMenuOpen, setPatchMenuOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const msgRef = useRef<HTMLTextAreaElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const patchMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!patchMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (patchMenuRef.current && !patchMenuRef.current.contains(e.target as Node)) setPatchMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [patchMenuOpen]);
+
+  const doImportPatch = async (file: File) => {
+    setImporting(true);
+    try {
+      const patch = await file.text();
+      const res = await fetch('/api/git/apply-patch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo, patch }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Patch applied', { description: data.result });
+      load();
+    } catch (e) {
+      toast.error('Apply patch failed', { description: String(e) });
+    } finally { setImporting(false); }
+  };
 
   const load = () => {
     if (!repo) return;
@@ -295,7 +343,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
         {hasFiles && staged.length === 0 && unstaged.length === 0 && <Empty label="No matching files" />}
         {staged.length > 0 && (
           <Section label="Staged" files={staged} repo={repo} selected={selected} selectedFile={selectedFile}
-            onFileSelect={onFileSelect} onToggle={toggleSelect}
+            onFileSelect={onFileSelect} onToggle={toggleSelect} onFirstContextMenu={ctxMenuHint.dismiss}
             onToggleAll={keys => {
               const allIn = keys.every(k => selected.has(k));
               setSelected(prev => { const next = new Set(prev); if (allIn) keys.forEach(k => next.delete(k)); else keys.forEach(k => next.add(k)); return next; });
@@ -304,7 +352,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
         )}
         {unstaged.length > 0 && (
           <Section label="Unstaged" files={unstaged} repo={repo} selected={selected} selectedFile={selectedFile}
-            onFileSelect={onFileSelect} onToggle={toggleSelect}
+            onFileSelect={onFileSelect} onToggle={toggleSelect} onFirstContextMenu={ctxMenuHint.dismiss}
             onToggleAll={keys => {
               const allIn = keys.every(k => selected.has(k));
               setSelected(prev => { const next = new Set(prev); if (allIn) keys.forEach(k => next.delete(k)); else keys.forEach(k => next.add(k)); return next; });
@@ -352,6 +400,60 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
               {selected.size > 0 ? `Discard (${selected.size})` : 'Discard all'}
             </button>
           )}
+          <div className="relative" ref={patchMenuRef}>
+            <button
+              onClick={() => setPatchMenuOpen(v => !v)}
+              className="h-7 px-3 rounded-md text-xs font-medium transition-colors flex items-center gap-1"
+              style={{ background: 'var(--bg-raised)', color: 'var(--foreground)' }}
+              title="Patch file options"
+            >
+              Patch
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" style={{ opacity: 0.5 }}>
+                <path d="M0 2l4 4 4-4z"/>
+              </svg>
+            </button>
+            {patchMenuOpen && (
+              <div
+                className="absolute bottom-full mb-1 right-0 z-50 py-1 rounded-xl shadow-xl min-w-[180px]"
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid color-mix(in oklch, var(--border-subtle) 80%, transparent)',
+                  boxShadow: '0 8px 32px color-mix(in oklch, black 30%, transparent)',
+                }}
+              >
+                <PatchMenuItem
+                  label="Download all changes"
+                  onClick={async () => {
+                    setPatchMenuOpen(false);
+                    try { await downloadPatch(repo, undefined, 'changes.patch'); }
+                    catch (e) { toast.error('Patch failed', { description: String(e) }); }
+                  }}
+                />
+                <PatchMenuItem
+                  label={`Download selected (${selected.size})`}
+                  disabled={selected.size === 0}
+                  onClick={async () => {
+                    setPatchMenuOpen(false);
+                    try { await downloadPatch(repo, [...selected], 'selected.patch'); }
+                    catch (e) { toast.error('Patch failed', { description: String(e) }); }
+                  }}
+                />
+                <div style={{ height: 1, margin: '4px 8px', background: 'color-mix(in oklch, var(--border-subtle) 60%, transparent)' }} />
+                <PatchMenuItem
+                  label={importing ? 'Applying…' : 'Import patch…'}
+                  disabled={importing}
+                  onClick={() => { setPatchMenuOpen(false); importInputRef.current?.click(); }}
+                />
+              </div>
+            )}
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".patch,.diff"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) doImportPatch(f); e.target.value = ''; }}
+          />
           <button
             onClick={() => guard(PUSH_OP, () => setPushOpen(true))}
             className="h-7 px-3 rounded-md text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
@@ -359,6 +461,13 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
             Push…
           </button>
         </div>
+      )}
+
+      {/* Context menu hint — shown once when files are present */}
+      {hasFiles && ctxMenuHint.show && (
+        <HintCallout onDismiss={ctxMenuHint.dismiss}>
+          Right-click any file to open in VS Code, copy its path, or download as a patch.
+        </HintCallout>
       )}
 
       {/* Commit modal */}
@@ -456,7 +565,22 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   );
 }
 
-function Section({ label, files, repo, selected, selectedFile, onFileSelect, onToggle, onToggleAll }: {
+function PatchMenuItem({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      disabled={disabled}
+      className="flex items-center gap-2.5 w-full px-3 py-1.5 text-xs text-left transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      style={{ color: 'var(--text-soft)' }}
+      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 60%, transparent)'; }}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Section({ label, files, repo, selected, selectedFile, onFileSelect, onToggle, onToggleAll, onFirstContextMenu }: {
   label: string;
   files: GitFile[];
   repo: string;
@@ -465,6 +589,7 @@ function Section({ label, files, repo, selected, selectedFile, onFileSelect, onT
   onFileSelect: (f: string, s: boolean) => void;
   onToggle: (key: string) => void;
   onToggleAll: (keys: string[]) => void;
+  onFirstContextMenu?: () => void;
 }) {
   const [ctxMenu, setCtxMenu] = useState<FileCtxMenu | null>(null);
 
@@ -511,7 +636,7 @@ function Section({ label, files, repo, selected, selectedFile, onFileSelect, onT
             }}
             onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
             onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = ''; }}
-            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, fullPath }); }}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onFirstContextMenu?.(); setCtxMenu({ x: e.clientX, y: e.clientY, fullPath, filePath: f.path, repo }); }}
           >
             <input
               type="checkbox"
@@ -569,6 +694,16 @@ function Section({ label, files, repo, selected, selectedFile, onFileSelect, onT
             label="Open in VS Code"
             onClick={() => { window.location.href = `vscode://file${ctxMenu.fullPath}?windowId=_blank`; setCtxMenu(null); }}
           />
+          <FileCtxItem
+            icon={<PatchIcon />}
+            label="Download patch"
+            onClick={async () => {
+              setCtxMenu(null);
+              const name = ctxMenu.filePath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'file';
+              try { await downloadPatch(ctxMenu.repo, [ctxMenu.filePath], `${name}.patch`); }
+              catch (e) { toast.error('Patch failed', { description: String(e) }); }
+            }}
+          />
         </div>
       )}
     </div>
@@ -602,6 +737,16 @@ function VSCodeIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
       <path d="M11.5 1.5l-7 5.5-3-2.5L0 5.5v5l1.5 1 3-2.5 7 5.5 3-1.5V3L11.5 1.5zM13 11.5L7 7.5v-1l6-4v9z"/>
+    </svg>
+  );
+}
+
+function PatchIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/>
+      <polyline points="9 2 9 6 13 6"/>
+      <line x1="5" y1="9" x2="11" y2="9"/><line x1="5" y1="12" x2="8" y2="12"/>
     </svg>
   );
 }

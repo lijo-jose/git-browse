@@ -303,7 +303,7 @@ function UnifiedView({ lines, chunks, acceptedChunks, onAccept }: {
   onAccept: (i: number, side: 'left' | 'right') => void;
 }) {
   return (
-    <div className="diff-scroll flex-1 overflow-auto min-h-0">
+    <div className="diff-scroll flex-1 overflow-auto min-h-0 min-w-0">
       <div className="font-mono text-[11.5px] leading-5 min-w-max">
         {lines.map((line, i) => {
           const chunkIdx = chunks.findIndex(c => c.startIndex <= i && i < c.startIndex + c.lines.length);
@@ -334,7 +334,7 @@ function SplitView({ lines, chunks, acceptedChunks, onAccept }: {
   const pairs = splitPairs(lines);
   let flatIdx = 0;
   return (
-    <div className="diff-scroll flex-1 overflow-auto min-h-0">
+    <div className="diff-scroll flex-1 overflow-auto min-h-0 min-w-0">
       <table className="font-mono text-[11.5px] leading-5 border-collapse min-w-max w-full">
         <tbody>
           {pairs.map((pair, pi) => {

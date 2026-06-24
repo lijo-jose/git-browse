@@ -58,9 +58,7 @@ export function listDirectory(dirPath: string): FsEntry[] {
   const resolved = resolvePath(dirPath);
   const entries = fs.readdirSync(resolved, { withFileTypes: true });
 
-  const visible = entries
-    .filter((e) => !e.name.startsWith('.') || e.name === '.git')
-    .filter((e) => e.name !== '.git');
+  const visible = entries.filter((e) => e.name !== '.git');
 
   const ignoredNames = getIgnoredNames(resolved, visible.map(e => e.name));
 

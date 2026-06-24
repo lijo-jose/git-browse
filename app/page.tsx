@@ -7,7 +7,10 @@ import DiffPanel from '@/components/panels/DiffPanel';
 import InlineCompare from '@/components/git/InlineCompare';
 import TopBar from '@/components/TopBar';
 import UserGuideModal, { useUserGuide } from '@/components/UserGuideModal';
-import { COMMAND_EVENT } from '@/components/CommandPalette';
+import DirPicker from '@/components/ui/DirPicker';
+import { COMMAND_EVENT, dispatchCommand } from '@/components/CommandPalette';
+import HintCallout from '@/components/HintCallout';
+import { useHint } from '@/lib/hints';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
 
@@ -27,6 +30,7 @@ export default function Home() {
   const [showDiff, setShowDiff] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const { guideOpen, openGuide, closeGuide } = useUserGuide();
+  const cmdPaletteHint = useHint('cmd-palette');
   const [clonedRepo, setClonedRepo] = useState<string | null>(null);
   const [compareBase, setCompareBase] = useState<string | null>(null); // null = off, string = compare mode
 
@@ -59,6 +63,16 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Auto-dismiss cmd-palette hint when the user first opens the palette
+  useEffect(() => {
+    if (!cmdPaletteHint.show) return;
+    const fn = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') cmdPaletteHint.dismiss();
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [cmdPaletteHint]);
+
   // Commands from the global palette (⌘K)
   useEffect(() => {
     const fn = (e: Event) => {
@@ -83,7 +97,11 @@ export default function Home() {
     <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
       <TopBar repo={repo} onRepoSelect={handleRepoSelect} onCloned={setClonedRepo} onOpenGuide={openGuide} />
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      {!repo && (
+        <WelcomeScreen onRepoSelect={(path) => { setClonedRepo(path); handleRepoSelect(path); }} />
+      )}
+
+      <div className={`flex flex-1 overflow-hidden min-h-0 ${!repo ? 'hidden' : ''}`}>
         {/* Left — file explorer (collapsible) */}
         <aside className={`flex-shrink-0 flex flex-col border-r border-[var(--border-subtle)]/60 bg-[var(--bg-panel)] transition-all duration-200 overflow-hidden ${showSidebar ? 'w-52' : 'w-0 border-r-0'}`}>
           <div className="w-52 flex flex-col h-full">
@@ -197,6 +215,13 @@ export default function Home() {
         )}
       </div>
 
+      {/* Command palette hint — shown once after first repo open */}
+      {repo && cmdPaletteHint.show && (
+        <HintCallout onDismiss={cmdPaletteHint.dismiss}>
+          Press <kbd className="px-1 py-0.5 rounded text-[10px] font-mono mx-0.5" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>⌘K</kbd> to open the command palette — push, pull, switch tabs, and more.
+        </HintCallout>
+      )}
+
       {/* Status bar */}
       <footer className="h-6 flex items-center gap-4 px-4 text-[10px] font-medium tracking-wide flex-shrink-0" style={{ background: 'var(--statusbar-bg)', color: 'oklch(0.97 0 0)' }}>
         <span className="font-semibold">⌘K — all commands</span>
@@ -215,6 +240,141 @@ export default function Home() {
       </footer>
 
       <UserGuideModal open={guideOpen} onClose={closeGuide} />
+    </div>
+  );
+}
+
+const RECENT_KEY = 'git-browser-recent';
+
+function WelcomeScreen({ onRepoSelect }: { onRepoSelect: (path: string) => void }) {
+  const [recent, setRecent] = useState<string[]>([]);
+  const [mode, setMode] = useState<'idle' | 'open' | 'recent'>('idle');
+  const [dirValue, setDirValue] = useState('~');
+
+  useEffect(() => {
+    try { setRecent(JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')); } catch {}
+  }, []);
+
+  const handleDirSelect = (path: string) => {
+    setMode('idle');
+    onRepoSelect(path);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-auto px-6 py-12" style={{ background: 'var(--bg-base, var(--background))' }}>
+      {/* Logo + title */}
+      <div className="flex items-center gap-3 mb-10">
+        <svg width="36" height="36" viewBox="0 0 56 56" aria-hidden="true">
+          <rect width="56" height="56" rx="14" fill="#1e293b"/>
+          <path d="M18 42 V22 Q18 16 24 16 H30" stroke="#f97316" strokeWidth="4" fill="none" strokeLinecap="round"/>
+          <circle cx="18" cy="42" r="4.5" fill="#e2e8f0"/>
+          <circle cx="33" cy="30" r="8" fill="none" stroke="#e2e8f0" strokeWidth="3.5"/>
+          <circle cx="33" cy="30" r="2.5" fill="#38bdf8"/>
+          <line x1="39" y1="36" x2="45" y2="42" stroke="#e2e8f0" strokeWidth="4" strokeLinecap="round"/>
+        </svg>
+        <div>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Git Browse</h1>
+          <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Local git workbench</p>
+        </div>
+      </div>
+
+      {/* Action tiles */}
+      <div className="flex gap-3 mb-8 flex-wrap justify-center">
+        {/* Open local folder */}
+        <div className="relative">
+          <button
+            onClick={() => setMode(mode === 'open' ? 'idle' : 'open')}
+            className="flex flex-col items-center gap-3 w-44 py-6 px-4 rounded-2xl border transition-all"
+            style={{
+              background: mode === 'open' ? 'color-mix(in oklch, var(--primary) 10%, var(--bg-panel))' : 'var(--bg-panel)',
+              borderColor: mode === 'open' ? 'var(--primary)' : 'var(--border-subtle)',
+              color: 'var(--foreground)',
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+            </svg>
+            <span className="text-sm font-medium">Open folder</span>
+            <span className="text-[10px] text-center leading-tight" style={{ color: 'var(--text-dim)' }}>Browse and open a local git repository</span>
+          </button>
+          {mode === 'open' && (
+            <div className="absolute top-full left-0 mt-2 z-50" style={{ width: 320 }}>
+              <DirPicker value={dirValue} onChange={handleDirSelect} onClose={() => setMode('idle')} />
+            </div>
+          )}
+        </div>
+
+        {/* Clone */}
+        <button
+          onClick={() => dispatchCommand('clone')}
+          className="flex flex-col items-center gap-3 w-44 py-6 px-4 rounded-2xl border transition-all hover:border-[var(--primary)] hover:bg-[color-mix(in_oklch,var(--primary)_5%,var(--bg-panel))]"
+          style={{ background: 'var(--bg-panel)', borderColor: 'var(--border-subtle)', color: 'var(--foreground)' }}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+            <path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2 13h12"/>
+            <circle cx="18" cy="18" r="3"/>
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="18" r="3"/>
+            <line x1="15.41" y1="6.41" x2="9" y2="15"/>
+            <line x1="9" y1="15" x2="9" y2="15"/>
+          </svg>
+          <span className="text-sm font-medium">Clone repo</span>
+          <span className="text-[10px] text-center leading-tight" style={{ color: 'var(--text-dim)' }}>Clone a remote repository to your machine</span>
+        </button>
+
+        {/* Recent repos */}
+        {recent.length > 0 && (
+          <button
+            onClick={() => setMode(mode === 'recent' ? 'idle' : 'recent')}
+            className="flex flex-col items-center gap-3 w-44 py-6 px-4 rounded-2xl border transition-all"
+            style={{
+              background: mode === 'recent' ? 'color-mix(in oklch, var(--primary) 10%, var(--bg-panel))' : 'var(--bg-panel)',
+              borderColor: mode === 'recent' ? 'var(--primary)' : 'var(--border-subtle)',
+              color: 'var(--foreground)',
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary)' }}>
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span className="text-sm font-medium">Recent repos</span>
+            <span className="text-[10px] text-center leading-tight" style={{ color: 'var(--text-dim)' }}>{recent.length} repo{recent.length !== 1 ? 's' : ''} opened before</span>
+          </button>
+        )}
+      </div>
+
+      {/* Recent list inline */}
+      {mode === 'recent' && recent.length > 0 && (
+        <div className="w-full max-w-md rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border-subtle)' }}>
+          <div className="px-4 py-2.5 border-b text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-dim)', borderColor: 'var(--border-subtle)' }}>
+            Recent repositories
+          </div>
+          {recent.map(r => (
+            <button
+              key={r}
+              onClick={() => onRepoSelect(r)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left border-b last:border-b-0 transition-colors hover:bg-[var(--bg-raised)]"
+              style={{ borderColor: 'var(--border-subtle)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-dim)', flexShrink: 0 }}>
+                <circle cx="3" cy="3" r="1.8"/><circle cx="3" cy="13" r="1.8"/><circle cx="13" cy="3" r="1.8"/>
+                <line x1="3" y1="4.8" x2="3" y2="11.2"/><path d="M3 7a5 5 0 005 5h2"/>
+              </svg>
+              <span className="text-sm truncate flex-1" style={{ color: 'var(--foreground)' }}>
+                {r.split('/').slice(-2).join('/')}
+              </span>
+              <span className="text-[10px] truncate max-w-[140px]" style={{ color: 'var(--text-dim)' }}>
+                {r}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Keyboard hint */}
+      <p className="mt-8 text-[11px]" style={{ color: 'var(--text-dim)' }}>
+        Press <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)' }}>⌘K</kbd> to open the command palette
+      </p>
     </div>
   );
 }

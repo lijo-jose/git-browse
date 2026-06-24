@@ -11,6 +11,8 @@ import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
 import { useOperationLog } from '@/lib/operationLog';
 import { gitErrorToast } from '@/lib/gitErrorToast';
+import HintCallout from '@/components/HintCallout';
+import { useHint } from '@/lib/hints';
 
 const TAG_OP: DangerOp = { id: 'tag', title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
 const REBASE_OP: DangerOp = { id: 'rebase', title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
@@ -22,6 +24,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   const { guard } = useDangerZone();
   const { start: startActivity } = useActivity();
   const { logOp } = useOperationLog();
+  const branchHint = useHint('branch-context-menu');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -238,7 +241,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       onMouseEnter={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
       onMouseLeave={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = ''; }}
       onClick={() => !b.current && !b.remote && setAction({ type: 'checkout', branch: b.name })}
-      onContextMenu={e => { e.preventDefault(); setContextMenu({ branch: b, x: e.clientX, y: e.clientY }); }}
+      onContextMenu={e => { e.preventDefault(); branchHint.dismiss(); setContextMenu({ branch: b, x: e.clientX, y: e.clientY }); }}
     >
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
@@ -289,6 +292,12 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Branch context menu hint — shown once when branches are loaded */}
+      {local.length > 0 && branchHint.show && (
+        <HintCallout onDismiss={branchHint.dismiss}>
+          Right-click any branch to merge, rebase, compare, or delete it.
+        </HintCallout>
+      )}
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
         {local.length > 0 && <><Label>Local</Label>{local.map(Row)}</>}
         {remote.length > 0 && <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>}
