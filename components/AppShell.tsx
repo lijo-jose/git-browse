@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import CommandPalette from './CommandPalette';
+import OperationDrawer from './OperationDrawer';
 import { Toaster } from './ui/sonner';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
@@ -131,9 +132,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {/* Page content */}
+      {/* Page content + operation drawer */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {children}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {children}
+        </div>
+        <OperationDrawer />
       </div>
 
       <CommandPalette />

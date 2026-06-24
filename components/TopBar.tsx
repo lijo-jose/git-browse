@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import RepoSettingsModal from './git/RepoSettingsModal';
 import { useActivity } from '@/lib/activity';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
 
 const PUSH_OP: DangerOp = { id: 'push', title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 const PULL_OP: DangerOp = { id: 'pull', title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
@@ -23,6 +25,7 @@ interface TopBarProps {
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const { unlocked, lock, unlock, guard } = useDangerZone();
   const { activities, start: startActivity } = useActivity();
+  const { logOp } = useOperationLog();
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -110,6 +113,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     setCloneOpen(false);
     setBusy('clone');
     setCloneProgress(remote);
+    const op = logOp('Clone', `git clone ${remote}`);
     try {
       const res = await fetch('/api/git/clone', {
         method: 'POST',
@@ -118,6 +122,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.path);
       setCloneProgress(null);
       toast.success('Cloned successfully', { description: data.path });
       onCloned?.(data.path);
@@ -130,7 +135,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       setBranchFilter('');
     } catch (e) {
       setCloneProgress(null);
-      toast.error('Clone failed', { description: String(e) });
+      gitErrorToast('Clone failed', e, op);
     } finally { setBusy(null); }
   };
 
@@ -181,8 +186,11 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const executeRun = async (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     setBusy(action);
+    const cmds: Record<string, string> = { fetch: 'git fetch', pull: 'git pull', push: 'git push' };
     const labels: Record<string, string> = { fetch: 'Fetching…', pull: 'Pulling…', push: 'Pushing…' };
+    const opLabels: Record<string, string> = { fetch: 'Fetch', pull: 'Pull', push: 'Push' };
     const stopActivity = startActivity(action, labels[action]);
+    const op = logOp(opLabels[action], cmds[action]);
     try {
       if (action === 'push') {
         const res = await fetch('/api/git/push', {
@@ -194,6 +202,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         if (data.error) {
           const noUpstream = /no upstream|set.upstream|has no upstream/i.test(data.error);
           if (noUpstream && branch) {
+            op.error('No upstream branch — set upstream first');
             setBusy(null);
             stopActivity();
             setUpstreamPrompt(true);
@@ -201,15 +210,17 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           }
           throw new Error(data.error);
         }
+        op.success(data.result || 'Done');
         toast.success('Pushed', { description: data.result || 'Done' });
       } else {
         const res = await fetch(`/api/git/${action}?repo=${encodeURIComponent(repo)}`, { method: 'POST' });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        op.success(data.result || 'Done');
         toast.success(`${action === 'fetch' ? 'Fetched' : 'Pulled'}`, { description: data.result || 'Done' });
       }
     } catch (e) {
-      toast.error(`${action} failed`, { description: String(e) });
+      gitErrorToast(`${action === 'fetch' ? 'Fetch' : action === 'pull' ? 'Pull' : 'Push'} failed`, e, op);
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
@@ -222,6 +233,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     if (!repo) return;
     setBusy('push');
     const stopActivity = startActivity('push', 'Pushing…');
+    const op = logOp('Push (set upstream)', `git push --set-upstream origin ${branch}`);
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
@@ -230,9 +242,10 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.result || 'Done');
       toast.success('Pushed', { description: data.result || 'Done' });
     } catch (e) {
-      toast.error('push failed', { description: String(e) });
+      gitErrorToast('Push failed', e, op);
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 

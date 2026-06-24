@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDangerZone } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
 
 const PUSH_OP = { id: 'push' as const, title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 
@@ -29,6 +31,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
 export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const { guard } = useDangerZone();
   const { start: startActivity } = useActivity();
+  const { logOp } = useOperationLog();
   const [files, setFiles] = useState<GitFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -103,21 +106,24 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
     if (!commitMsg.trim()) { msgRef.current?.focus(); return; }
     setCommitting(true);
     const stopActivity = startActivity('commit', 'Committing…');
+    const msg = commitMsg.trim();
+    const op = logOp('Commit', `git commit -m "${msg.length > 50 ? msg.slice(0, 50) + '…' : msg}"`);
     try {
       const res = await fetch('/api/git/commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, message: commitMsg, all: commitAll }),
+        body: JSON.stringify({ repo, message: msg, all: commitAll }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.result);
       toast.success('Committed', { description: data.result });
       setCommitOpen(false);
       setCommitMsg('');
       setCommitAll(false);
       load();
     } catch (e) {
-      toast.error('Commit failed', { description: String(e) });
+      gitErrorToast('Commit failed', e, op);
     } finally { setCommitting(false); stopActivity(); }
   };
 
@@ -148,6 +154,8 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const doPush = async () => {
     setPushing(true);
     const stopActivity = startActivity('push', 'Pushing…');
+    const cmd = pushSetUpstream ? `git push --set-upstream origin ${pushBranchName}` : 'git push';
+    const op = logOp('Push', cmd);
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
@@ -156,11 +164,12 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.result);
       toast.success('Pushed', { description: data.result });
       setPushOpen(false);
       setPushSetUpstream(false);
     } catch (e) {
-      toast.error('Push failed', { description: String(e) });
+      gitErrorToast('Push failed', e, op);
     } finally { setPushing(false); stopActivity(); }
   };
 
