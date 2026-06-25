@@ -21,6 +21,7 @@ export default function Home() {
     try {
       const saved = localStorage.getItem(LAST_REPO_KEY);
       if (saved) setRepo(saved);
+      if (localStorage.getItem('git-tree-sidebar') === '0') setShowSidebar(false);
     } catch {}
   }, []);
   const [activeTab, setActiveTab] = useState('log');
@@ -29,6 +30,9 @@ export default function Home() {
   const [selectedCommit, setSelectedCommit] = useState<string | undefined>();
   const [showDiff, setShowDiff] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
+  useEffect(() => {
+    try { localStorage.setItem('git-tree-sidebar', showSidebar ? '1' : '0'); } catch {}
+  }, [showSidebar]);
   const { guideOpen, openGuide, closeGuide } = useUserGuide();
   const cmdPaletteHint = useHint('cmd-palette');
   const [clonedRepo, setClonedRepo] = useState<string | null>(null);

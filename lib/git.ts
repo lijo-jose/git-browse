@@ -564,11 +564,17 @@ export async function pushBranch(
   repoPath: string,
   setUpstream: boolean,
   branch: string,
+  remote?: string,
 ): Promise<string> {
   const git = getGit(repoPath);
   if (setUpstream) {
-    await git.push(['--set-upstream', 'origin', branch]);
-    return `Pushed and set upstream: origin/${branch}`;
+    const target = remote || 'origin';
+    await git.push(['--set-upstream', target, branch]);
+    return `Pushed and set upstream: ${target}/${branch}`;
+  }
+  if (remote) {
+    await git.push([remote]);
+    return `Pushed to ${remote}`;
   }
   await git.push();
   return 'Pushed successfully';

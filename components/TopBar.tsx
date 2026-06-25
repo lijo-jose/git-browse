@@ -47,6 +47,9 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sync, setSync] = useState<{ ahead: number; behind: number; tracking: string | null } | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [remotes, setRemotes] = useState<{ name: string; pushUrl: string }[]>([]);
+  const [remotePicker, setRemotePicker] = useState(false);
+  const [selectedRemotes, setSelectedRemotes] = useState<string[]>([]);
 
   const loadSyncStatus = (path: string | null) => {
     if (!path) { setSync(null); return; }
@@ -59,13 +62,15 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const syncRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!repo) { setBranch(''); setRepoName(''); setSync(null); setRemoteUrl(null); return; }
+    if (!repo) { setBranch(''); setRepoName(''); setSync(null); setRemoteUrl(null); setRemotes([]); return; }
     setRepoName(repo.split('/').pop() || repo);
     loadSyncStatus(repo);
     fetch(`/api/git/info?repo=${encodeURIComponent(repo)}`)
       .then(r => r.json())
       .then(d => {
-        const origin = (d.remotes || []).find((r: { name: string; fetchUrl: string }) => r.name === 'origin');
+        const allRemotes: { name: string; fetchUrl: string; pushUrl: string }[] = d.remotes || [];
+        setRemotes(allRemotes.map(r => ({ name: r.name, pushUrl: r.pushUrl || r.fetchUrl })));
+        const origin = allRemotes.find(r => r.name === 'origin');
         if (!origin) { setRemoteUrl(null); return; }
         let url: string = origin.fetchUrl;
         // convert SSH git@github.com:user/repo.git → https://github.com/user/repo
@@ -73,7 +78,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         url = url.replace(/\.git$/, '');
         setRemoteUrl(url);
       })
-      .catch(() => setRemoteUrl(null));
+      .catch(() => { setRemoteUrl(null); setRemotes([]); });
     fetch(`/api/git/branches?repo=${encodeURIComponent(repo)}`)
       .then(r => r.json())
       .then(d => {
@@ -180,13 +185,21 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const run = (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     if (action === 'fetch') { executeRun('fetch'); return; }
+    if (action === 'push' && remotes.length > 1) {
+      guard(PUSH_OP, () => {
+        setSelectedRemotes([remotes[0].name]);
+        setRemotePicker(true);
+      });
+      return;
+    }
     guard(action === 'push' ? PUSH_OP : PULL_OP, () => executeRun(action));
   };
 
-  const executeRun = async (action: 'fetch' | 'pull' | 'push') => {
+  const executeRun = async (action: 'fetch' | 'pull' | 'push', remote?: string) => {
     if (!repo) return;
     setBusy(action);
-    const cmds: Record<string, string> = { fetch: 'git fetch', pull: 'git pull', push: 'git push' };
+    const cmdSuffix = remote ? ` ${remote}` : '';
+    const cmds: Record<string, string> = { fetch: 'git fetch', pull: 'git pull', push: `git push${cmdSuffix}` };
     const labels: Record<string, string> = { fetch: 'Fetching…', pull: 'Pulling…', push: 'Pushing…' };
     const opLabels: Record<string, string> = { fetch: 'Fetch', pull: 'Pull', push: 'Push' };
     const stopActivity = startActivity(action, labels[action]);
@@ -196,7 +209,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         const res = await fetch('/api/git/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repo, setUpstream: false, branch: '' }),
+          body: JSON.stringify({ repo, setUpstream: false, branch: '', remote: remote || undefined }),
         });
         const data = await res.json();
         if (data.error) {
@@ -224,21 +237,22 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
-  const pushWithUpstream = () => {
+  const pushWithUpstream = (remote?: string) => {
     setUpstreamPrompt(false);
-    guard(PUSH_OP, executePushWithUpstream);
+    guard(PUSH_OP, () => executePushWithUpstream(remote));
   };
 
-  const executePushWithUpstream = async () => {
+  const executePushWithUpstream = async (remote?: string) => {
     if (!repo) return;
+    const target = remote || 'origin';
     setBusy('push');
     const stopActivity = startActivity('push', 'Pushing…');
-    const op = logOp('Push (set upstream)', `git push --set-upstream origin ${branch}`);
+    const op = logOp('Push (set upstream)', `git push --set-upstream ${target} ${branch}`);
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, setUpstream: true, branch }),
+        body: JSON.stringify({ repo, setUpstream: true, branch, remote: target }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -247,6 +261,13 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     } catch (e) {
       gitErrorToast('Push failed', e, op);
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
+  };
+
+  const confirmRemotePush = async () => {
+    setRemotePicker(false);
+    for (const remote of selectedRemotes) {
+      await executeRun('push', remote);
+    }
   };
 
   return (
@@ -559,6 +580,44 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       </div>
     </header>
 
+    {/* Remote picker for push when multiple remotes exist */}
+    <Dialog open={remotePicker} onOpenChange={setRemotePicker}>
+      <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Push to Remote</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs" style={{ color: 'var(--text-soft)' }}>Select which remote(s) to push to:</p>
+        <div className="flex flex-col gap-1.5">
+          {remotes.map(r => (
+            <label key={r.name} className="flex items-start gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-[var(--bg-raised)] transition-colors">
+              <input
+                type="checkbox"
+                className="mt-0.5 flex-shrink-0"
+                checked={selectedRemotes.includes(r.name)}
+                onChange={e => setSelectedRemotes(prev =>
+                  e.target.checked ? [...prev, r.name] : prev.filter(n => n !== r.name)
+                )}
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>{r.name}</p>
+                {r.pushUrl && <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'var(--text-dim)' }} title={r.pushUrl}>{r.pushUrl}</p>}
+              </div>
+            </label>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setRemotePicker(false)} className="text-xs">Cancel</Button>
+          <Button
+            disabled={selectedRemotes.length === 0}
+            onClick={confirmRemotePush}
+            className="text-xs bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40"
+          >
+            Push{selectedRemotes.length > 1 ? ` to ${selectedRemotes.length} remotes` : selectedRemotes.length === 1 ? ` to ${selectedRemotes[0]}` : ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     {/* No-upstream push confirm */}
     <Dialog open={upstreamPrompt} onOpenChange={setUpstreamPrompt}>
       <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
@@ -573,7 +632,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         </p>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setUpstreamPrompt(false)} className="text-xs">Cancel</Button>
-          <Button onClick={pushWithUpstream} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">Push & set upstream</Button>
+          <Button onClick={() => pushWithUpstream()} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">Push & set upstream</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

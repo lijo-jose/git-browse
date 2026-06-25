@@ -84,6 +84,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Narrow-viewport gate — shown below md breakpoint (< 768px) */}
+      <div className="md:hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5 px-8 text-center"
+        style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--bg-raised)' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-dim)' }}>
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">Desktop required</p>
+          <p className="text-xs leading-relaxed max-w-[260px]" style={{ color: 'var(--text-dim)' }}>
+            git-browse is a desktop tool. Please open it on a wider screen.
+          </p>
+        </div>
+      </div>
+
       {/* Activity rail */}
       <nav className="w-12 flex-shrink-0 flex flex-col items-center py-2 gap-1 bg-[var(--bg-panel)] border-r border-[var(--border-subtle)]/60 select-none">
         <Link href="/" title="Git Browse" className="w-7 h-7 mb-2 flex items-center justify-center">
