@@ -44,18 +44,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: '/git-compare',
-      label: 'Git Compare',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="4" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="12" cy="3" r="1.5"/>
-          <line x1="4" y1="4.5" x2="4" y2="11.5"/><path d="M4 6a4 4 0 004 4h3"/><path d="M10 7.5l1.5-1.5L10 4.5"/>
-        </svg>
-      ),
-    },
-    {
       href: '/compare',
-      label: 'Compare files / folders',
+      label: 'Compare',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M8 6H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3"/>
@@ -83,10 +73,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  // Carry the current repo into Git Compare so context follows the user
+  // Carry the current repo into Compare (git mode) so context follows the user
   const hrefFor = (item: NavItem) => {
-    if (item.href !== '/git-compare' || !lastRepo) return item.href;
-    return `/git-compare?repo=${encodeURIComponent(lastRepo)}`;
+    if (item.href !== '/compare' || !lastRepo) return item.href;
+    return `/compare?mode=git&repo=${encodeURIComponent(lastRepo)}`;
   };
 
   const isActive = (href: string) =>
