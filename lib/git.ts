@@ -1,6 +1,6 @@
 import simpleGit, { SimpleGit, LogResult } from 'simple-git';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, isAbsolute } from 'path';
 
@@ -14,6 +14,7 @@ export interface GitFileStatus {
   staged: boolean;
   index?: string;
   working?: string;
+  fileSize?: number;
 }
 
 export async function getStatus(repoPath: string): Promise<GitFileStatus[]> {
@@ -25,13 +26,19 @@ export async function getStatus(repoPath: string): Promise<GitFileStatus[]> {
     const index = f.index.trim();
     const working = f.working_dir.trim();
     if (index && index !== ' ' && index !== '?') {
-      files.push({ path: f.path, status: mapStatus(index), staged: true, index, working });
+      const fileSize = (index === 'A') ? getFileSize(join(repoPath, f.path)) : undefined;
+      files.push({ path: f.path, status: mapStatus(index), staged: true, index, working, fileSize });
     }
     if (working && working !== ' ') {
-      files.push({ path: f.path, status: mapStatus(working), staged: false, index, working });
+      const fileSize = (working === '?') ? getFileSize(join(repoPath, f.path)) : undefined;
+      files.push({ path: f.path, status: mapStatus(working), staged: false, index, working, fileSize });
     }
   }
   return files;
+}
+
+function getFileSize(filePath: string): number | undefined {
+  try { return statSync(filePath).size; } catch { return undefined; }
 }
 
 function mapStatus(s: string): GitFileStatus['status'] {

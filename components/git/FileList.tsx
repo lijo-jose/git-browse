@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-interface GitFile { path: string; status: string; staged: boolean; }
+interface GitFile { path: string; status: string; staged: boolean; fileSize?: number; }
 interface Props { repo: string; onFileSelect: (f: string, s: boolean) => void; selectedFile?: string; }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -662,6 +662,25 @@ function Section({ label, files, repo, selected, selectedFile, onFileSelect, onT
             >
               {f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : ''}
             </span>
+            {f.fileSize !== undefined && (() => {
+              const isLarge = f.fileSize >= 1024 * 1024;
+              return (
+                <span
+                  className="text-[10px] font-medium flex-shrink-0 px-1.5 py-0.5 rounded"
+                  style={{
+                    background: isLarge
+                      ? 'color-mix(in oklch, oklch(0.65 0.18 50) 15%, transparent)'
+                      : 'color-mix(in oklch, var(--bg-raised) 80%, transparent)',
+                    color: isLarge ? 'oklch(0.65 0.18 50)' : 'var(--text-dim)',
+                    outline: isLarge ? '1px solid color-mix(in oklch, oklch(0.65 0.18 50) 30%, transparent)' : undefined,
+                    outlineOffset: '-1px',
+                  }}
+                  title={isLarge ? 'Large file — confirm it should be tracked in git' : undefined}
+                >
+                  {isLarge && '⚠ '}{formatFileSize(f.fileSize)}
+                </span>
+              );
+            })()}
           </div>
         );
       })}
@@ -749,6 +768,12 @@ function PatchIcon() {
       <line x1="5" y1="9" x2="11" y2="9"/><line x1="5" y1="12" x2="8" y2="12"/>
     </svg>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
 }
 
 function Empty({ label }: { label: string }) {
