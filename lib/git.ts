@@ -328,8 +328,9 @@ export async function getTags(repoPath: string): Promise<TagInfo[]> {
 export async function createAndPushTag(repoPath: string, tag: string): Promise<string> {
   const git = getGit(repoPath);
   await git.tag([tag]);
-  await git.push(['origin', tag]);
-  return `Tagged and pushed: ${tag}`;
+  const remote = resolveDefaultRemote(repoPath);
+  await git.push([remote, tag]);
+  return `Tagged and pushed to ${remote}: ${tag}`;
 }
 
 // ── Checkout file(s) ─────────────────────────────────────────────────────────
@@ -517,6 +518,33 @@ export function skipRebase(repoPath: string): RebaseState {
 
 export interface RemoteInfo { name: string; fetchUrl: string; pushUrl: string; }
 
+/**
+ * Pick the remote to push to when the caller didn't name one.
+ * Order of preference: the branch's configured upstream remote →
+ * remote.pushDefault → "origin" → the first remote that exists.
+ * Throws a clear error when the repo has no remotes at all, so callers
+ * never silently fall back to a non-existent "origin".
+ */
+export function resolveDefaultRemote(repoPath: string, branch?: string): string {
+  const names = execSync('git remote', { cwd: repoPath, encoding: 'utf8' })
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  if (names.length === 0) {
+    throw new Error('No remote is configured for this repository. Add a remote first.');
+  }
+  const config = (key: string): string => {
+    try { return execSync(`git config --get ${key}`, { cwd: repoPath, encoding: 'utf8' }).trim(); }
+    catch { return ''; }
+  };
+  if (branch) {
+    const branchRemote = config(`branch.${branch}.remote`);
+    if (branchRemote && names.includes(branchRemote)) return branchRemote;
+  }
+  const pushDefault = config('remote.pushDefault');
+  if (pushDefault && names.includes(pushDefault)) return pushDefault;
+  if (names.includes('origin')) return 'origin';
+  return names[0];
+}
+
 export async function getRemotes(repoPath: string): Promise<RemoteInfo[]> {
   const raw = execSync('git remote -v', { cwd: repoPath, encoding: 'utf8' });
   const map = new Map<string, RemoteInfo>();
@@ -575,7 +603,7 @@ export async function pushBranch(
 ): Promise<string> {
   const git = getGit(repoPath);
   if (setUpstream) {
-    const target = remote || 'origin';
+    const target = remote || resolveDefaultRemote(repoPath, branch);
     await git.push(['--set-upstream', target, branch]);
     return `Pushed and set upstream: ${target}/${branch}`;
   }

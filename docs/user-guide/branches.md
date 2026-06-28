@@ -41,6 +41,10 @@ Right-click any branch for the context menu:
 
 ---
 
+Rebasing rewrites history, so **Rebase onto** and **Interactive rebase** are guarded by the [danger zone](settings.md#security--danger-zone) — the first rebase asks you to confirm unless you've unlocked the Rebase operation.
+
+---
+
 ## Interactive rebase
 
 The **Interactive rebase** dialog lets you reorder, squash, reword, fixup, and drop commits using buttons instead of editing a `pick` list in a terminal editor.
@@ -56,7 +60,9 @@ Tags are listed below branches in the Branches tab, with their date and commit s
 **To create a tag:**
 1. Press `T` or click **New tag** (or use ⌘K → "Create tag")
 2. Enter a tag name (e.g. `v1.2.0`) and optional message
-3. Click **Create & push** to tag HEAD and push the tag to origin in one step
+3. Click **Create & push** to tag HEAD and push the tag to the remote in one step
+
+Because **Create & push** pushes the tag immediately, it's guarded by the [danger zone](settings.md#security--danger-zone) and confirms before running the first time.
 
 ![New tag dialog](../../public/doc-images/04-new-tag-dialog.png)
 

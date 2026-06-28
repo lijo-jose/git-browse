@@ -33,26 +33,47 @@ Each remote shows its fetch and push URLs. Actions available:
 - **Remove** — delete the remote (two-step confirm)
 - **Add remote** — add a new remote with a name and URL
 
+When a repo has **more than one remote**, pushing opens a picker so you can choose exactly which remote(s) to push to — see [Selective remote push](changes.md#push) in the Changes guide. Git Browse no longer assumes a remote named `origin`; when it has to pick a default it prefers the branch's upstream remote, then `remote.pushDefault`, then `origin`, then your first remote.
+
 ---
 
 ## Security — Danger Zone
 
 ![Repository Settings — Security](../../public/doc-images/screenshot-2026-06-21-at-9.18.22-am.png)
 
-The danger zone controls whether remote operations require a confirmation dialog.
+The danger zone guards potentially destructive git operations behind a confirmation dialog. Unlocking is **per operation** — confirming (or always-allowing) one operation does not unlock the others.
 
-| State | Behaviour |
+Guarded operations:
+
+| Operation | What it covers |
 |---|---|
-| **Locked** (default) | Push and pull show a confirmation dialog with the exact command before running |
-| **Unlocked** | Push and pull run immediately on the first click |
+| **Push** | `git push`, including push-and-set-upstream |
+| **Pull** | `git pull` (may create merge commits or conflicts) |
+| **Create & push tag** | Tagging HEAD and pushing the tag to the remote |
+| **Rebase** | Rebase onto another branch and interactive rebase (rewrites history) |
 
-The current state is shown by a lock icon in the top bar.
+### How a guarded operation behaves
+
+When an operation is **locked** (the default), triggering it opens a confirmation dialog describing what it does. You then choose:
+
+- **Proceed once** — run it this one time; the operation stays locked.
+- **Always allow** — run it now and unlock this operation so future runs skip the dialog.
+- **Cancel** — do nothing.
+
+When an operation is **unlocked**, it runs immediately on the first click.
+
+### The lock toggle in the top bar
+
+The lock icon in the top bar reflects whether **any** operation is currently unlocked. Clicking it is a bulk switch:
+
+- If everything is locked, it **unlocks all** guarded operations.
+- If anything is unlocked, it **locks all** of them again.
 
 **When to unlock:** During a release session or heavy rebase work where you're running many syncs in sequence and confirmation dialogs are just noise.
 
-**When to keep locked:** On shared branches where a mistaken push has real consequences.
+**When to keep locked:** On shared branches where a mistaken push or history rewrite has real consequences.
 
-This setting is persisted in your browser per machine.
+Unlock state is persisted in your browser's local storage, per machine — it survives reloads and is remembered the next time you open Git Browse.
 
 ---
 

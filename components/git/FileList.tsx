@@ -67,6 +67,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const [pushing, setPushing] = useState(false);
   const [pushSetUpstream, setPushSetUpstream] = useState(false);
   const [pushBranchName, setPushBranchName] = useState('');
+  const [defaultRemote, setDefaultRemote] = useState('origin');
   const [patchMenuOpen, setPatchMenuOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const msgRef = useRef<HTMLTextAreaElement>(null);
@@ -119,6 +120,13 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
       .then(d => {
         const cur = (d.branches || []).find((b: { current: boolean; name: string }) => b.current);
         if (cur) setPushBranchName(cur.name);
+      }).catch(() => {});
+    fetch(`/api/git/info?repo=${encodeURIComponent(repo)}`)
+      .then(r => r.json())
+      .then(d => {
+        const remotes: { name: string }[] = d.remotes || [];
+        const def = remotes.find(r => r.name === 'origin')?.name || remotes[0]?.name;
+        if (def) setDefaultRemote(def);
       }).catch(() => {});
   }, [repo]);
 
@@ -202,7 +210,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
   const doPush = async () => {
     setPushing(true);
     const stopActivity = startActivity('push', 'Pushing…');
-    const cmd = pushSetUpstream ? `git push --set-upstream origin ${pushBranchName}` : 'git push';
+    const cmd = pushSetUpstream ? `git push --set-upstream ${defaultRemote} ${pushBranchName}` : 'git push';
     const op = logOp('Push', cmd);
     try {
       const res = await fetch('/api/git/push', {
@@ -513,7 +521,7 @@ export default function FileList({ repo, onFileSelect, selectedFile }: Props) {
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" checked={pushSetUpstream} onChange={e => setPushSetUpstream(e.target.checked)} className="w-3.5 h-3.5 accent-blue-500" />
               <span className="text-xs" style={{ color: 'var(--text-soft)' }}>
-                Create branch in origin (<code style={{ color: 'var(--foreground)' }}>--set-upstream</code>)
+                Create branch in {defaultRemote} (<code style={{ color: 'var(--foreground)' }}>--set-upstream</code>)
               </span>
             </label>
             {pushSetUpstream && (

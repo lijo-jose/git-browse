@@ -237,6 +237,10 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
+  // Pick a sensible default remote instead of assuming "origin" exists.
+  const defaultRemote = () =>
+    remotes.find(r => r.name === 'origin')?.name || remotes[0]?.name || 'origin';
+
   const pushWithUpstream = (remote?: string) => {
     setUpstreamPrompt(false);
     guard(PUSH_OP, () => executePushWithUpstream(remote));
@@ -244,7 +248,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
 
   const executePushWithUpstream = async (remote?: string) => {
     if (!repo) return;
-    const target = remote || 'origin';
+    const target = remote || defaultRemote();
     setBusy('push');
     const stopActivity = startActivity('push', 'Pushing…');
     const op = logOp('Push (set upstream)', `git push --set-upstream ${target} ${branch}`);
@@ -628,7 +632,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           Branch <span className="font-mono text-blue-500">{branch}</span> has no upstream.
         </p>
         <p className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>
-          git push --set-upstream origin {branch}
+          git push --set-upstream {defaultRemote()} {branch}
         </p>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setUpstreamPrompt(false)} className="text-xs">Cancel</Button>

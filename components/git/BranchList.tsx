@@ -492,7 +492,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
               className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60"
               style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}
             />
-            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Tags <span className="font-mono">{currentBranch}</span> at HEAD and pushes the tag to origin</p>
+            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Tags <span className="font-mono">{currentBranch}</span> at HEAD and pushes the tag to the remote</p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTagDialogOpen(false)} className="text-xs">Cancel</Button>
