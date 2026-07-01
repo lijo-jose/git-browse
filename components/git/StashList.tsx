@@ -3,10 +3,13 @@
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
 
 interface Stash { index: number; message: string; date?: string; }
 
 export default function StashList({ repo }: { repo: string }) {
+  const { logOp } = useOperationLog();
   const [stashes, setStashes] = useState<Stash[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,9 +32,11 @@ export default function StashList({ repo }: { repo: string }) {
 
   const stashChanges = async () => {
     setStashing(true);
+    const msg = stashMsg.trim();
+    const op = logOp('Stash', msg ? `git stash push -m "${msg}"` : 'git stash push');
     try {
       const body: Record<string, string> = { repo };
-      if (stashMsg.trim()) body.message = stashMsg.trim();
+      if (msg) body.message = msg;
       const res = await fetch('/api/git/stash-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,24 +44,28 @@ export default function StashList({ repo }: { repo: string }) {
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
+      op.success(d.result || 'Stashed changes');
       toast.success(d.result || 'Stashed changes');
       setStashMsg('');
       setShowMsgInput(false);
       load();
-    } catch (e) { toast.error(String(e)); }
+    } catch (e) { gitErrorToast('Stash failed', e, op); }
     finally { setStashing(false); }
   };
 
   const act = async (index: number, action: 'apply' | 'pop' | 'drop') => {
     setActing(index);
+    const cmdMap = { apply: `git stash apply stash@{${index}}`, pop: `git stash pop stash@{${index}}`, drop: `git stash drop stash@{${index}}` };
+    const op = logOp(`Stash ${action}`, cmdMap[action]);
     try {
       const res = await fetch(`/api/git/stash/apply?repo=${encodeURIComponent(repo)}&index=${index}&action=${action}`, { method: 'POST' });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
       const label = action === 'apply' ? 'applied' : action === 'pop' ? 'popped' : 'dropped';
+      op.success(`Stash ${label}`);
       toast.success(`Stash ${label}`);
       load();
-    } catch (e) { toast.error(String(e)); }
+    } catch (e) { gitErrorToast(`Stash ${action} failed`, e, op); }
     finally { setActing(null); }
   };
 

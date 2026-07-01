@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import RepoSettingsModal from './git/RepoSettingsModal';
 import { useActivity } from '@/lib/activity';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
 
 const PUSH_OP: DangerOp = { id: 'push', title: 'Push', description: 'Pushes commits to the remote repository. Cannot be undone without a force-push.' };
 const PULL_OP: DangerOp = { id: 'pull', title: 'Pull', description: 'Merges remote changes into your local branch. May create merge commits or conflicts.' };
@@ -23,6 +25,7 @@ interface TopBarProps {
 export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: TopBarProps) {
   const { unlocked, lock, unlock, guard } = useDangerZone();
   const { activities, start: startActivity } = useActivity();
+  const { logOp } = useOperationLog();
   const [branch, setBranch] = useState('');
   const [repoName, setRepoName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -44,6 +47,9 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sync, setSync] = useState<{ ahead: number; behind: number; tracking: string | null } | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [remotes, setRemotes] = useState<{ name: string; pushUrl: string }[]>([]);
+  const [remotePicker, setRemotePicker] = useState(false);
+  const [selectedRemotes, setSelectedRemotes] = useState<string[]>([]);
 
   const loadSyncStatus = (path: string | null) => {
     if (!path) { setSync(null); return; }
@@ -56,13 +62,15 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const syncRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!repo) { setBranch(''); setRepoName(''); setSync(null); setRemoteUrl(null); return; }
+    if (!repo) { setBranch(''); setRepoName(''); setSync(null); setRemoteUrl(null); setRemotes([]); return; }
     setRepoName(repo.split('/').pop() || repo);
     loadSyncStatus(repo);
     fetch(`/api/git/info?repo=${encodeURIComponent(repo)}`)
       .then(r => r.json())
       .then(d => {
-        const origin = (d.remotes || []).find((r: { name: string; fetchUrl: string }) => r.name === 'origin');
+        const allRemotes: { name: string; fetchUrl: string; pushUrl: string }[] = d.remotes || [];
+        setRemotes(allRemotes.map(r => ({ name: r.name, pushUrl: r.pushUrl || r.fetchUrl })));
+        const origin = allRemotes.find(r => r.name === 'origin');
         if (!origin) { setRemoteUrl(null); return; }
         let url: string = origin.fetchUrl;
         // convert SSH git@github.com:user/repo.git → https://github.com/user/repo
@@ -70,7 +78,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
         url = url.replace(/\.git$/, '');
         setRemoteUrl(url);
       })
-      .catch(() => setRemoteUrl(null));
+      .catch(() => { setRemoteUrl(null); setRemotes([]); });
     fetch(`/api/git/branches?repo=${encodeURIComponent(repo)}`)
       .then(r => r.json())
       .then(d => {
@@ -110,6 +118,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
     setCloneOpen(false);
     setBusy('clone');
     setCloneProgress(remote);
+    const op = logOp('Clone', `git clone ${remote}`);
     try {
       const res = await fetch('/api/git/clone', {
         method: 'POST',
@@ -118,6 +127,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.path);
       setCloneProgress(null);
       toast.success('Cloned successfully', { description: data.path });
       onCloned?.(data.path);
@@ -130,7 +140,7 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       setBranchFilter('');
     } catch (e) {
       setCloneProgress(null);
-      toast.error('Clone failed', { description: String(e) });
+      gitErrorToast('Clone failed', e, op);
     } finally { setBusy(null); }
   };
 
@@ -175,25 +185,37 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
   const run = (action: 'fetch' | 'pull' | 'push') => {
     if (!repo) return;
     if (action === 'fetch') { executeRun('fetch'); return; }
+    if (action === 'push' && remotes.length > 1) {
+      guard(PUSH_OP, () => {
+        setSelectedRemotes([remotes[0].name]);
+        setRemotePicker(true);
+      });
+      return;
+    }
     guard(action === 'push' ? PUSH_OP : PULL_OP, () => executeRun(action));
   };
 
-  const executeRun = async (action: 'fetch' | 'pull' | 'push') => {
+  const executeRun = async (action: 'fetch' | 'pull' | 'push', remote?: string) => {
     if (!repo) return;
     setBusy(action);
+    const cmdSuffix = remote ? ` ${remote}` : '';
+    const cmds: Record<string, string> = { fetch: 'git fetch', pull: 'git pull', push: `git push${cmdSuffix}` };
     const labels: Record<string, string> = { fetch: 'Fetching…', pull: 'Pulling…', push: 'Pushing…' };
+    const opLabels: Record<string, string> = { fetch: 'Fetch', pull: 'Pull', push: 'Push' };
     const stopActivity = startActivity(action, labels[action]);
+    const op = logOp(opLabels[action], cmds[action]);
     try {
       if (action === 'push') {
         const res = await fetch('/api/git/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repo, setUpstream: false, branch: '' }),
+          body: JSON.stringify({ repo, setUpstream: false, branch: '', remote: remote || undefined }),
         });
         const data = await res.json();
         if (data.error) {
           const noUpstream = /no upstream|set.upstream|has no upstream/i.test(data.error);
           if (noUpstream && branch) {
+            op.error('No upstream branch — set upstream first');
             setBusy(null);
             stopActivity();
             setUpstreamPrompt(true);
@@ -201,39 +223,55 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           }
           throw new Error(data.error);
         }
+        op.success(data.result || 'Done');
         toast.success('Pushed', { description: data.result || 'Done' });
       } else {
         const res = await fetch(`/api/git/${action}?repo=${encodeURIComponent(repo)}`, { method: 'POST' });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        op.success(data.result || 'Done');
         toast.success(`${action === 'fetch' ? 'Fetched' : 'Pulled'}`, { description: data.result || 'Done' });
       }
     } catch (e) {
-      toast.error(`${action} failed`, { description: String(e) });
+      gitErrorToast(`${action === 'fetch' ? 'Fetch' : action === 'pull' ? 'Pull' : 'Push'} failed`, e, op);
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
   };
 
-  const pushWithUpstream = () => {
+  // Pick a sensible default remote instead of assuming "origin" exists.
+  const defaultRemote = () =>
+    remotes.find(r => r.name === 'origin')?.name || remotes[0]?.name || 'origin';
+
+  const pushWithUpstream = (remote?: string) => {
     setUpstreamPrompt(false);
-    guard(PUSH_OP, executePushWithUpstream);
+    guard(PUSH_OP, () => executePushWithUpstream(remote));
   };
 
-  const executePushWithUpstream = async () => {
+  const executePushWithUpstream = async (remote?: string) => {
     if (!repo) return;
+    const target = remote || defaultRemote();
     setBusy('push');
     const stopActivity = startActivity('push', 'Pushing…');
+    const op = logOp('Push (set upstream)', `git push --set-upstream ${target} ${branch}`);
     try {
       const res = await fetch('/api/git/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, setUpstream: true, branch }),
+        body: JSON.stringify({ repo, setUpstream: true, branch, remote: target }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      op.success(data.result || 'Done');
       toast.success('Pushed', { description: data.result || 'Done' });
     } catch (e) {
-      toast.error('push failed', { description: String(e) });
+      gitErrorToast('Push failed', e, op);
     } finally { setBusy(null); stopActivity(); loadSyncStatus(repo); }
+  };
+
+  const confirmRemotePush = async () => {
+    setRemotePicker(false);
+    for (const remote of selectedRemotes) {
+      await executeRun('push', remote);
+    }
   };
 
   return (
@@ -546,6 +584,44 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
       </div>
     </header>
 
+    {/* Remote picker for push when multiple remotes exist */}
+    <Dialog open={remotePicker} onOpenChange={setRemotePicker}>
+      <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Push to Remote</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs" style={{ color: 'var(--text-soft)' }}>Select which remote(s) to push to:</p>
+        <div className="flex flex-col gap-1.5">
+          {remotes.map(r => (
+            <label key={r.name} className="flex items-start gap-2.5 px-3 py-2 rounded-lg cursor-pointer hover:bg-[var(--bg-raised)] transition-colors">
+              <input
+                type="checkbox"
+                className="mt-0.5 flex-shrink-0"
+                checked={selectedRemotes.includes(r.name)}
+                onChange={e => setSelectedRemotes(prev =>
+                  e.target.checked ? [...prev, r.name] : prev.filter(n => n !== r.name)
+                )}
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>{r.name}</p>
+                {r.pushUrl && <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'var(--text-dim)' }} title={r.pushUrl}>{r.pushUrl}</p>}
+              </div>
+            </label>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setRemotePicker(false)} className="text-xs">Cancel</Button>
+          <Button
+            disabled={selectedRemotes.length === 0}
+            onClick={confirmRemotePush}
+            className="text-xs bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40"
+          >
+            Push{selectedRemotes.length > 1 ? ` to ${selectedRemotes.length} remotes` : selectedRemotes.length === 1 ? ` to ${selectedRemotes[0]}` : ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     {/* No-upstream push confirm */}
     <Dialog open={upstreamPrompt} onOpenChange={setUpstreamPrompt}>
       <DialogContent className="sm:max-w-sm shadow-2xl" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}>
@@ -556,11 +632,11 @@ export default function TopBar({ repo, onRepoSelect, onCloned, onOpenGuide }: To
           Branch <span className="font-mono text-blue-500">{branch}</span> has no upstream.
         </p>
         <p className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: 'var(--bg-raised)', color: 'var(--text-dim)' }}>
-          git push --set-upstream origin {branch}
+          git push --set-upstream {defaultRemote()} {branch}
         </p>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setUpstreamPrompt(false)} className="text-xs">Cancel</Button>
-          <Button onClick={pushWithUpstream} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">Push & set upstream</Button>
+          <Button onClick={() => pushWithUpstream()} className="text-xs bg-blue-600 hover:bg-blue-500 text-white">Push & set upstream</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

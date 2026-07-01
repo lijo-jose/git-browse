@@ -30,7 +30,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | [Compare](compare.md) | Git compare, folder compare, file compare, clipboard diff |
 | [Search](search.md) | Grep file contents, find files by name |
 | [Insights](insights.md) | Commit heatmap, contributors, hotspot files, branch network |
-| [Repository Settings](settings.md) | Git identity, remotes, danger zone |
+| [Repository Settings](settings.md) | Git identity, remotes, per-operation danger zone |
+| [Activity & Error Recovery](operations.md) | Operation drawer, smart error suggestions |
 | [Keyboard Shortcuts](keyboard-shortcuts.md) | All keyboard shortcuts |
 
 ---
@@ -44,6 +45,10 @@ Git Browse uses a three-panel layout:
 - **Right — Diff**: The diff viewer. Click any file or commit to see its diff here.
 
 Both the Explorer and Diff panels are independently collapsible (`E` and `D`).
+
+A slim **operation drawer** runs along the bottom of the window, showing the most recent git command and its status. Click it to see the full activity log — see [Activity & Error Recovery](operations.md).
+
+The first time you open a repo, Git Browse shows a couple of dismissable **hints** (for example, pointing you at the `⌘K` command palette). Each hint disappears once you use the feature or click its ✕, and stays dismissed afterwards.
 
 ---
 

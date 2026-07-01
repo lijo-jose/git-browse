@@ -99,6 +99,21 @@ export default function InlineCompare({ repo, initialBase = '', onClose }: Props
         )}
 
         <div className="ml-auto flex items-center gap-1">
+          {/* Open full-page compare */}
+          <a
+            href={`/compare?mode=git${repo ? `&repo=${encodeURIComponent(repo)}` : ''}${base ? `&base=${encodeURIComponent(base)}` : ''}`}
+            title="Open in full page"
+            target="_blank"
+            rel="noreferrer"
+            className="w-6 h-6 flex items-center justify-center rounded-md transition-colors"
+            style={{ color: 'var(--text-dim)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-raised)'; (e.currentTarget as HTMLElement).style.color = 'var(--foreground)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'; }}
+          >
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 2h3v3M10 2L6 6M5 3H3a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V7"/>
+            </svg>
+          </a>
           {/* Close / exit compare mode */}
           <button onClick={onClose} title="Exit compare"
             className="ml-2 w-6 h-6 flex items-center justify-center rounded-md transition-colors"

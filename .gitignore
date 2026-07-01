@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 tmp
+
+docs/medium
+images/
+vscode-git-browse

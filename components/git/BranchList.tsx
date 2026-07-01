@@ -9,6 +9,10 @@ import InteractiveRebaseDialog from './InteractiveRebaseDialog';
 import { COMMAND_EVENT } from '@/components/CommandPalette';
 import { useDangerZone, type DangerOp } from '@/lib/dangerZone';
 import { useActivity } from '@/lib/activity';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
+import HintCallout from '@/components/HintCallout';
+import { useHint } from '@/lib/hints';
 
 const TAG_OP: DangerOp = { id: 'tag', title: 'Create & push tag', description: 'Creates a tag at the current HEAD and immediately pushes it to the remote. Tags are difficult to remove once pushed.' };
 const REBASE_OP: DangerOp = { id: 'rebase', title: 'Rebase', description: 'Rewrites commit history. This is dangerous on branches that have already been pushed — collaborators will need to force-pull.' };
@@ -19,6 +23,8 @@ type Action = { type: 'checkout' | 'merge' | 'rebase' | 'delete'; branch: string
 export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: string; onBranchSwitch?: () => void; onCompare?: (branch: string) => void }) {
   const { guard } = useDangerZone();
   const { start: startActivity } = useActivity();
+  const { logOp } = useOperationLog();
+  const branchHint = useHint('branch-context-menu');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,6 +69,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     guard(TAG_OP, async () => {
       setTagging(true);
       const stopActivity = startActivity('tag', 'Creating tag…');
+      const op = logOp('Tag', `git tag ${t} && git push --tags`);
       try {
         const res = await fetch('/api/git/tag', {
           method: 'POST',
@@ -71,11 +78,12 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
+        op.success(d.result || t);
         toast.success('Tag created & pushed', { description: d.result || t });
         setTagDialogOpen(false);
         setTagName('');
         load();
-      } catch (e) { toast.error('Tag failed', { description: String(e) }); }
+      } catch (e) { gitErrorToast('Tag failed', e, op); }
       finally { setTagging(false); stopActivity(); }
     });
   };
@@ -110,12 +118,21 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
     if (!action) return;
     setBusy(true);
     const actionLabels: Record<string, string> = { checkout: 'Switching branch…', merge: 'Merging…', rebase: 'Rebasing…', delete: 'Deleting branch…' };
+    const actionCmds: Record<string, string> = {
+      checkout: `git checkout ${action.branch}`,
+      merge: `git merge ${action.branch}`,
+      rebase: `git rebase ${action.branch}`,
+      delete: `git branch -d ${action.branch}`,
+    };
+    const opLabels: Record<string, string> = { checkout: 'Checkout', merge: 'Merge', rebase: 'Rebase', delete: 'Delete branch' };
     const stopActivity = startActivity('branch-op', actionLabels[action.type] ?? 'Working…');
+    const op = logOp(opLabels[action.type] ?? action.type, actionCmds[action.type] ?? action.type);
     try {
       if (action.type === 'checkout') {
         const res = await fetch(`/api/git/checkout?repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(action.branch)}`, { method: 'POST' });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
+        op.success(`Switched to ${action.branch}`);
         toast.success(`Switched to ${action.branch}`);
         onBranchSwitch?.();
         setBranches(prev => prev.map(b => ({ ...b, current: b.name === action.branch })));
@@ -127,6 +144,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
+        op.success(d.result);
         toast.success(`Merged ${action.branch}`, { description: d.result });
         onBranchSwitch?.();
       } else if (action.type === 'rebase') {
@@ -137,6 +155,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
+        op.success(d.result);
         toast.success(d.result);
         onBranchSwitch?.();
       } else if (action.type === 'delete') {
@@ -147,10 +166,11 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
         });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
+        op.success(`Deleted ${action.branch}`);
         toast.success(`Deleted branch ${action.branch}`);
         load();
       }
-    } catch (e) { toast.error(`${action.type} failed`, { description: String(e) }); }
+    } catch (e) { gitErrorToast(`${action.type.charAt(0).toUpperCase() + action.type.slice(1)} failed`, e, op); }
     finally { setBusy(false); stopActivity(); setAction(null); }
   };
 
@@ -175,22 +195,25 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   };
 
   const doRebase = () => {
-    if (!rebaseBranch.trim()) return;
+    const b = rebaseBranch.trim();
+    if (!b) return;
     guard(REBASE_OP, async () => {
       setRebasing(true);
+      const op = logOp('Rebase', `git rebase ${b}`);
       try {
         const res = await fetch('/api/git/rebase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repo, branch: rebaseBranch.trim() }),
+          body: JSON.stringify({ repo, branch: b }),
         });
         const d = await res.json();
         if (d.error) throw new Error(d.error);
-        toast.success(d.result || `Rebased onto ${rebaseBranch.trim()}`);
+        op.success(d.result || `Rebased onto ${b}`);
+        toast.success(d.result || `Rebased onto ${b}`);
         setRebaseOpen(false);
         setRebaseBranch('');
         onBranchSwitch?.();
-      } catch (e) { toast.error('Rebase failed', { description: String(e) }); }
+      } catch (e) { gitErrorToast('Rebase failed', e, op); }
       finally { setRebasing(false); }
     });
   };
@@ -218,7 +241,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
       onMouseEnter={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = 'color-mix(in oklch, var(--bg-raised) 50%, transparent)'; }}
       onMouseLeave={e => { if (!b.current) (e.currentTarget as HTMLElement).style.background = ''; }}
       onClick={() => !b.current && !b.remote && setAction({ type: 'checkout', branch: b.name })}
-      onContextMenu={e => { e.preventDefault(); setContextMenu({ branch: b, x: e.clientX, y: e.clientY }); }}
+      onContextMenu={e => { e.preventDefault(); branchHint.dismiss(); setContextMenu({ branch: b, x: e.clientX, y: e.clientY }); }}
     >
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
@@ -268,7 +291,13 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full min-h-0">
+      {/* Branch context menu hint — shown once when branches are loaded */}
+      {local.length > 0 && branchHint.show && (
+        <HintCallout onDismiss={branchHint.dismiss}>
+          Right-click any branch to merge, rebase, compare, or delete it.
+        </HintCallout>
+      )}
       <div className="flex-1 overflow-y-auto py-2 min-h-0">
         {local.length > 0 && <><Label>Local</Label>{local.map(Row)}</>}
         {remote.length > 0 && <><Label className="mt-2">Remote</Label>{remote.map(Row)}</>}
@@ -463,7 +492,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
               className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60"
               style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--foreground)' }}
             />
-            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Tags <span className="font-mono">{currentBranch}</span> at HEAD and pushes the tag to origin</p>
+            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>Tags <span className="font-mono">{currentBranch}</span> at HEAD and pushes the tag to the remote</p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTagDialogOpen(false)} className="text-xs">Cancel</Button>
@@ -502,7 +531,7 @@ export default function BranchList({ repo, onBranchSwitch, onCompare }: { repo: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 

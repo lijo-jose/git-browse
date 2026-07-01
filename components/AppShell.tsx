@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import CommandPalette from './CommandPalette';
+import OperationDrawer from './OperationDrawer';
 import { Toaster } from './ui/sonner';
 
 const LAST_REPO_KEY = 'git-browser-last-repo';
@@ -43,18 +44,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: '/git-compare',
-      label: 'Git Compare',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="4" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="12" cy="3" r="1.5"/>
-          <line x1="4" y1="4.5" x2="4" y2="11.5"/><path d="M4 6a4 4 0 004 4h3"/><path d="M10 7.5l1.5-1.5L10 4.5"/>
-        </svg>
-      ),
-    },
-    {
       href: '/compare',
-      label: 'Compare files / folders',
+      label: 'Compare',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M8 6H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3"/>
@@ -82,10 +73,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  // Carry the current repo into Git Compare so context follows the user
+  // Carry the current repo into Compare (git mode) so context follows the user
   const hrefFor = (item: NavItem) => {
-    if (item.href !== '/git-compare' || !lastRepo) return item.href;
-    return `/git-compare?repo=${encodeURIComponent(lastRepo)}`;
+    if (item.href !== '/compare' || !lastRepo) return item.href;
+    return `/compare?mode=git&repo=${encodeURIComponent(lastRepo)}`;
   };
 
   const isActive = (href: string) =>
@@ -93,6 +84,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Narrow-viewport gate — shown below md breakpoint (< 768px) */}
+      <div className="md:hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5 px-8 text-center"
+        style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--bg-raised)' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-dim)' }}>
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">Desktop required</p>
+          <p className="text-xs leading-relaxed max-w-[260px]" style={{ color: 'var(--text-dim)' }}>
+            git-browse is a desktop tool. Please open it on a wider screen.
+          </p>
+        </div>
+      </div>
+
       {/* Activity rail */}
       <nav className="w-12 flex-shrink-0 flex flex-col items-center py-2 gap-1 bg-[var(--bg-panel)] border-r border-[var(--border-subtle)]/60 select-none">
         <Link href="/" title="Git Browse" className="w-7 h-7 mb-2 flex items-center justify-center">
@@ -131,9 +138,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {/* Page content */}
+      {/* Page content + operation drawer */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {children}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {children}
+        </div>
+        <OperationDrawer />
       </div>
 
       <CommandPalette />

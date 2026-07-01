@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useOperationLog } from '@/lib/operationLog';
+import { gitErrorToast } from '@/lib/gitErrorToast';
 
 interface RebaseCommit { hash: string; shortHash: string; subject: string; author: string; date: string; }
 type RebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop';
@@ -29,6 +31,7 @@ export default function InteractiveRebaseDialog({
   initialBase?: string;
   onDone?: () => void;
 }) {
+  const { logOp } = useOperationLog();
   const [base, setBase] = useState('');
   const [rows, setRows] = useState<TodoRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,6 +82,7 @@ export default function InteractiveRebaseDialog({
 
   const run = async () => {
     setRunning(true);
+    const op = logOp('Interactive rebase', `git rebase -i ${base}`);
     try {
       const res = await fetch('/api/git/rebase', {
         method: 'POST',
@@ -90,21 +94,25 @@ export default function InteractiveRebaseDialog({
       });
       const d = await res.json();
       if (d.state?.inProgress) {
+        op.error('Paused on conflicts');
         setState(d.state);
         toast.warning('Rebase paused on conflicts');
       } else if (d.error) {
         throw new Error(d.error);
       } else {
+        op.success(d.result || 'Rebase completed');
         toast.success(d.result || 'Rebase completed');
         onOpenChange(false);
         onDone?.();
       }
-    } catch (e) { toast.error('Rebase failed', { description: String(e) }); }
+    } catch (e) { gitErrorToast('Rebase failed', e, op); }
     finally { setRunning(false); }
   };
 
   const resolveAction = async (action: 'continue' | 'skip' | 'abort') => {
     setRunning(true);
+    const cmdMap = { continue: 'git rebase --continue', skip: 'git rebase --skip', abort: 'git rebase --abort' };
+    const op = logOp(`Rebase ${action}`, cmdMap[action]);
     try {
       const res = await fetch('/api/git/rebase', {
         method: 'POST',
@@ -113,17 +121,19 @@ export default function InteractiveRebaseDialog({
       });
       const d = await res.json();
       if (d.state?.inProgress) {
+        op.error(d.error || 'More conflicts');
         setState(d.state);
         toast.warning(d.error ? 'Resolve and stage conflicts first' : 'Stopped again — more conflicts', { description: d.error });
       } else if (d.error) {
         throw new Error(d.error);
       } else {
+        op.success(d.result || `Rebase ${action === 'abort' ? 'aborted' : 'completed'}`);
         toast.success(d.result || `Rebase ${action === 'abort' ? 'aborted' : 'completed'}`);
         setState(null);
         onOpenChange(false);
         onDone?.();
       }
-    } catch (e) { toast.error(`Rebase ${action} failed`, { description: String(e) }); }
+    } catch (e) { gitErrorToast(`Rebase ${action} failed`, e, op); }
     finally { setRunning(false); }
   };
 

@@ -1,6 +1,6 @@
 import simpleGit, { SimpleGit, LogResult } from 'simple-git';
 import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, isAbsolute } from 'path';
 
@@ -14,6 +14,7 @@ export interface GitFileStatus {
   staged: boolean;
   index?: string;
   working?: string;
+  fileSize?: number;
 }
 
 export async function getStatus(repoPath: string): Promise<GitFileStatus[]> {
@@ -25,13 +26,19 @@ export async function getStatus(repoPath: string): Promise<GitFileStatus[]> {
     const index = f.index.trim();
     const working = f.working_dir.trim();
     if (index && index !== ' ' && index !== '?') {
-      files.push({ path: f.path, status: mapStatus(index), staged: true, index, working });
+      const fileSize = (index === 'A') ? getFileSize(join(repoPath, f.path)) : undefined;
+      files.push({ path: f.path, status: mapStatus(index), staged: true, index, working, fileSize });
     }
     if (working && working !== ' ') {
-      files.push({ path: f.path, status: mapStatus(working), staged: false, index, working });
+      const fileSize = (working === '?') ? getFileSize(join(repoPath, f.path)) : undefined;
+      files.push({ path: f.path, status: mapStatus(working), staged: false, index, working, fileSize });
     }
   }
   return files;
+}
+
+function getFileSize(filePath: string): number | undefined {
+  try { return statSync(filePath).size; } catch { return undefined; }
 }
 
 function mapStatus(s: string): GitFileStatus['status'] {
@@ -140,6 +147,28 @@ export async function getDiff(
     return git.diff(['--', file]);
   }
   return git.diff();
+}
+
+export async function getPatch(repoPath: string, files?: string[]): Promise<string> {
+  const git = getGit(repoPath);
+  const hasCommits = (() => {
+    try { execSync('git rev-parse HEAD', { cwd: repoPath, stdio: 'ignore' }); return true; }
+    catch { return false; }
+  })();
+  const base = hasCommits ? ['HEAD'] : ['--cached'];
+  const args = files && files.length > 0 ? [...base, '--', ...files] : base;
+  return git.diff(args);
+}
+
+export async function applyPatch(repoPath: string, patchContent: string): Promise<string> {
+  const tmpFile = join(tmpdir(), `git-tree-patch-${Date.now()}.patch`);
+  writeFileSync(tmpFile, patchContent, 'utf8');
+  try {
+    execSync(`git apply ${JSON.stringify(tmpFile)}`, { cwd: repoPath, encoding: 'utf8' });
+    return 'Patch applied successfully';
+  } finally {
+    try { rmSync(tmpFile); } catch { /* ignore */ }
+  }
 }
 
 // ── Branch/commit compare ─────────────────────────────────────────────────────
@@ -299,8 +328,9 @@ export async function getTags(repoPath: string): Promise<TagInfo[]> {
 export async function createAndPushTag(repoPath: string, tag: string): Promise<string> {
   const git = getGit(repoPath);
   await git.tag([tag]);
-  await git.push(['origin', tag]);
-  return `Tagged and pushed: ${tag}`;
+  const remote = resolveDefaultRemote(repoPath);
+  await git.push([remote, tag]);
+  return `Tagged and pushed to ${remote}: ${tag}`;
 }
 
 // ── Checkout file(s) ─────────────────────────────────────────────────────────
@@ -488,6 +518,33 @@ export function skipRebase(repoPath: string): RebaseState {
 
 export interface RemoteInfo { name: string; fetchUrl: string; pushUrl: string; }
 
+/**
+ * Pick the remote to push to when the caller didn't name one.
+ * Order of preference: the branch's configured upstream remote →
+ * remote.pushDefault → "origin" → the first remote that exists.
+ * Throws a clear error when the repo has no remotes at all, so callers
+ * never silently fall back to a non-existent "origin".
+ */
+export function resolveDefaultRemote(repoPath: string, branch?: string): string {
+  const names = execSync('git remote', { cwd: repoPath, encoding: 'utf8' })
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  if (names.length === 0) {
+    throw new Error('No remote is configured for this repository. Add a remote first.');
+  }
+  const config = (key: string): string => {
+    try { return execSync(`git config --get ${key}`, { cwd: repoPath, encoding: 'utf8' }).trim(); }
+    catch { return ''; }
+  };
+  if (branch) {
+    const branchRemote = config(`branch.${branch}.remote`);
+    if (branchRemote && names.includes(branchRemote)) return branchRemote;
+  }
+  const pushDefault = config('remote.pushDefault');
+  if (pushDefault && names.includes(pushDefault)) return pushDefault;
+  if (names.includes('origin')) return 'origin';
+  return names[0];
+}
+
 export async function getRemotes(repoPath: string): Promise<RemoteInfo[]> {
   const raw = execSync('git remote -v', { cwd: repoPath, encoding: 'utf8' });
   const map = new Map<string, RemoteInfo>();
@@ -542,11 +599,17 @@ export async function pushBranch(
   repoPath: string,
   setUpstream: boolean,
   branch: string,
+  remote?: string,
 ): Promise<string> {
   const git = getGit(repoPath);
   if (setUpstream) {
-    await git.push(['--set-upstream', 'origin', branch]);
-    return `Pushed and set upstream: origin/${branch}`;
+    const target = remote || resolveDefaultRemote(repoPath, branch);
+    await git.push(['--set-upstream', target, branch]);
+    return `Pushed and set upstream: ${target}/${branch}`;
+  }
+  if (remote) {
+    await git.push([remote]);
+    return `Pushed to ${remote}`;
   }
   await git.push();
   return 'Pushed successfully';

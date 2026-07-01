@@ -61,8 +61,10 @@ export default function CommandPalette() {
 
   const commands: Command[] = useMemo(() => [
     { id: 'nav:/',            group: 'Go to', title: 'Repository' },
-    { id: 'nav:/git-compare', group: 'Go to', title: 'Git Compare', keywords: 'branch tag commit diff' },
-    { id: 'nav:/compare',     group: 'Go to', title: 'Compare files / folders', keywords: 'clipboard diff' },
+    { id: 'nav:/compare?mode=git',       group: 'Go to', title: 'Git Compare',             keywords: 'branch tag commit diff git' },
+    { id: 'nav:/compare?mode=folders',   group: 'Go to', title: 'Compare folders',          keywords: 'diff directory' },
+    { id: 'nav:/compare?mode=files',     group: 'Go to', title: 'Compare files',            keywords: 'diff file' },
+    { id: 'nav:/compare?mode=clipboard', group: 'Go to', title: 'Compare clipboard / text', keywords: 'diff paste' },
     { id: 'nav:/search',      group: 'Go to', title: 'Search', keywords: 'grep find' },
 
     { id: 'sync:pull',  group: 'Git', title: 'Pull',  hint: 'U · git pull' },

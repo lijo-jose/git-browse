@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
 import { DangerZoneProvider } from "@/lib/dangerZone";
 import { ActivityProvider } from "@/lib/activity";
+import { OperationLogProvider } from "@/lib/operationLog";
 import AppShell from "@/components/AppShell";
 
 const inter = Inter({
@@ -48,7 +49,9 @@ export default function RootLayout({
         <ThemeProvider>
           <DangerZoneProvider>
             <ActivityProvider>
-              <AppShell>{children}</AppShell>
+              <OperationLogProvider>
+                <AppShell>{children}</AppShell>
+              </OperationLogProvider>
             </ActivityProvider>
           </DangerZoneProvider>
         </ThemeProvider>
